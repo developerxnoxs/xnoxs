@@ -4,7 +4,7 @@
  * Edit file ini sebelum deploy
  */
 
-define('BOT_TOKEN', '8798938545:AAHFUIEFDMgg47PcEoQsz20OM_elaMjBRGw');
+define('BOT_TOKEN', '');
 define('BOT_USERNAME', 'xnoxsguard_bot');
 
 // Superadmin Telegram User ID (bisa lebih dari satu)
@@ -27,8 +27,8 @@ define('WARN_LIMIT', 3);
 
 // hCaptcha (untuk verifikasi anggota baru via web)
 // Daftar gratis di: https://www.hcaptcha.com/
-define('HCAPTCHA_SITEKEY', 'a45ab59c-8b1a-4512-b77c-0e6e7e3e4ed6');  // Isi dengan Site Key dari dashboard hCaptcha
-define('HCAPTCHA_SECRET',  'ES_3de38330936e44e183a5f82d5aad2270');  // Isi dengan Secret Key dari dashboard hCaptcha
+define('HCAPTCHA_SITEKEY', '');  // Isi dengan Site Key dari dashboard hCaptcha
+define('HCAPTCHA_SECRET',  '');  // Isi dengan Secret Key dari dashboard hCaptcha
 
 // Timezone
 date_default_timezone_set('Asia/Jakarta');
