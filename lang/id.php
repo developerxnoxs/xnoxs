@@ -44,18 +44,139 @@ return [
     'start.btn_language'      => '🌐 Bahasa / Language',
 
     // ======================== HELP ========================
-    'help.title'              => "📖 <b>Daftar Perintah</b>\n\n",
-    'help.general'            => "<b>━ Perintah Umum ━</b>\n/rules — tampilkan peraturan grup\n/me — lihat status saya di grup ini\n/id — tampilkan ID chat &amp; user\n/info @user — lihat informasi seorang anggota\n/stats — statistik aktivitas grup\n/warns — cek jumlah peringatan saya\n/notes — daftar catatan yang tersimpan di grup\n/report — laporkan pesan ke admin\n\n",
-    'help.admin'              => "<b>━ Perintah Admin ━</b>\n/ban @user — ban permanen\n/tban @user 1d — ban sementara (contoh: 30m, 2h, 7d)\n/unban @user — cabut ban\n/kick @user — keluarkan dari grup\n/mute @user — bisukan user\n/mute @user 1h — bisukan sementara\n/unmute @user — cabut bisukan\n/warn @user — beri peringatan\n/unwarn @user — hapus satu peringatan\n/clearwarns @user — hapus semua peringatan\n/promote @user — jadikan admin\n/demote @user — copot dari jabatan admin\n/settitle @user judul — atur judul admin\n/pin — pin pesan (reply ke pesan)\n/unpin — lepas pin pesan\n/unpinall — lepas semua pin\n/del — hapus pesan (reply ke pesan)\n/purge — hapus pesan massal (reply ke pesan awal)\n/clearall — hapus semua pesan terbaru di grup (hingga 4.000 pesan, maks 48 jam)\n/slowmode 30 — atur slowmode dalam detik (0 = nonaktif)\n/tagall — mention semua anggota grup\n/kickbots — keluarkan semua bot dari grup\n/cleandel — keluarkan anggota dengan akun yang sudah dihapus\n\n",
-    'help.lock'               => "<b>━ Kunci Konten ━</b>\n/lock sticker — kunci pengiriman stiker\n/lock gif — kunci pengiriman GIF\n/lock media — kunci pengiriman foto/video\n/lock voice — kunci pengiriman pesan suara\n/lock game — kunci pengiriman game\n/lock poll — kunci pembuatan polling\n/lock forward — kunci pesan yang di-forward\n/unlock [jenis] — buka kunci jenis konten tertentu\n/locks — tampilkan status semua kunci\n\n",
-    'help.note'               => "<b>━ Catatan (Note) ━</b>\n/save kata teks — simpan catatan dengan kata kunci\n/get kata — ambil catatan berdasarkan kata kunci\n/notes — tampilkan semua catatan di grup\n/clear kata — hapus catatan tertentu\nAtau kirim <code>#kata</code> untuk mengambil catatan\n\n",
-    'help.filter'             => "<b>━ Filter Otomatis ━</b>\n/filter kata respons — tambah filter auto-reply\n/filters — tampilkan semua filter aktif\n/stop kata — hapus filter tertentu\n/banword kata — tambah kata terlarang\n/unbanword kata — hapus kata dari daftar terlarang\n/banwords — tampilkan daftar kata terlarang\n\n",
-    'help.violation'          => "<b>━ Poin Sanksi ━</b>\n/vpoints @user — cek poin sanksi user\n/resetvp @user — reset poin sanksi ke 0\n/topviolators — daftar pelanggar dengan poin terbanyak\n\n",
-    'help.sang_mata'          => "<b>━ Sang Mata ━</b>\n/sangmata @user — lihat riwayat perubahan username\n/cekun @user — alias untuk /sangmata\n(aktifkan di /settings untuk notifikasi otomatis)\n\n",
-    'help.votekick'           => "<b>━ Vote Kick ━</b>\n/votekick @user alasan — ajukan vote kick untuk anggota\n/cancelvotekick @user — batalkan sesi vote kick yang sedang berjalan\n\n",
-    'help.ai'                 => "<b>━ Asisten AI ━</b>\n/ai pertanyaan — tanya DeepSeek AI\n/resetai — hapus riwayat percakapan AI\n\n<b>📸 Gambar AI (hanya di chat pribadi)</b>\n/imagine deskripsi — buat gambar dengan AI\n/gambar deskripsi — alias untuk /imagine\n/edit instruksi — edit foto (reply ke foto lalu kirim perintah)\n<i>Tips: Reply pesan lalu ketik /ai untuk menganalisis pesan tersebut</i>\n\n",
-    'help.settings'           => "<b>━ Pengaturan ━</b>\n/settings — buka panel pengaturan lengkap via tombol inline\n/setrules — atur peraturan grup\n/setwelcome — atur pesan sambutan anggota baru\n/setgoodbye — atur pesan perpisahan anggota keluar\n/setlogchannel — atur channel log aktivitas\n/invitelink — dapatkan link undangan grup\n/ro — aktifkan atau nonaktifkan mode readonly\n/setlang — ubah bahasa bot\n\n",
-    'help.sa'                 => "<b>━ Superadmin ━</b>\n/sa — buka panel superadmin\n/gban ID alasan — global ban user di semua grup\n/ungban ID — cabut global ban\n/gbanlist — tampilkan daftar global ban\n/broadcast — kirim pesan ke semua grup\n/ping — cek respons dan latensi bot\n/sainfo — informasi superadmin\n/backup — backup database bot\n/logs — lihat log aktivitas bot\n/lookup — cari informasi user\n/maintenance — aktifkan atau nonaktifkan mode maintenance\n/addsa ID — tambah superadmin baru\n/rmsa ID — hapus superadmin\n/salist — tampilkan daftar superadmin\n/massban — ban massal user\n/cleargban — hapus semua global ban\n/announce — kirim pengumuman resmi ke semua grup",
+    'help.title'              => "📖 <b>Daftar Perintah Bot</b>\n\n",
+    'help.overview'           => "Pilih kategori di tombol bawah atau ketik <code>/help [kategori]</code> (contoh: <code>/help ai</code>, <code>/help admin</code>):\n\n"
+                                . "📋 <b>Umum</b> (<code>general</code>): /rules, /me, /id, /info, /stats, /adminlist, /warns, /notes, /report, /checkperms, /cekverif\n"
+                                . "🛡️ <b>Admin</b> (<code>admin</code>): /ban, /tban, /unban, /kick, /mute, /unmute, /warn, /unwarn, /clearwarns, /promote, /demote, /settitle, /pin, /unpin, /unpinall, /del, /purge, /clearall, /slowmode, /tagall, /kickbots, /cleandel\n"
+                                . "🔒 <b>Konten</b> (<code>content</code>): /lock, /unlock, /locks, /save, /get, /notes, /clear, #keyword, /filter, /filters, /stop, /banword, /unbanword, /banwords\n"
+                                . "⚖️ <b>Sanksi &amp; Mata</b> (<code>safety</code>): /vpoints, /resetvp, /topviolators, /sangmata, /cekun, /votekick, /cancelvotekick\n"
+                                . "🤖 <b>AI &amp; Tools</b> (<code>ai</code>): /ai, /resetai, /translate, /detect, /summarize, /imagine, /edit, /run, /price, /setlang, /features\n"
+                                . "⚙️ <b>Pengaturan</b> (<code>settings</code>): /settings (grup &amp; PM), /setrules, /setwelcome, /setgoodbye, /setlogchannel, /invitelink, /ro, /setlang\n",
+    'help.overview_sa'        => "🔐 <b>Superadmin</b> (<code>sa</code>): /sa, /gban, /ungban, /gbanlist, /massban, /cleargban, /broadcast, /announce, /lookup, /sainfo, /ping, /sysinfo, /backup, /logs, /maintenance, /addsa, /rmsa, /salist, /email, /tempmail, /whm, /cpanel\n",
+    'help.sa_restricted'      => '❌ Menu bantuan Superadmin hanya dapat diakses oleh Superadmin.',
+    'help.btn_overview'       => '📖 Ringkasan',
+    'help.btn_general'        => '📋 Umum',
+    'help.btn_admin'          => '🛡️ Admin',
+    'help.btn_content'        => '🔒 Konten & Filter',
+    'help.btn_safety'         => '⚖️ Sanksi & Mata',
+    'help.btn_ai'             => '🤖 AI & Tools',
+    'help.btn_settings'       => '⚙️ Pengaturan',
+    'help.btn_sa'             => '🔐 Superadmin',
+    'help.btn_features'       => '⭐ Fitur Lengkap',
+    'help.btn_close'          => '✖️ Tutup',
+    'help.general'            => "<b>━ 📋 Perintah Umum ━</b>\n"
+                                . "/rules — tampilkan peraturan grup\n"
+                                . "/me — lihat status saya di grup ini\n"
+                                . "/id — tampilkan ID chat &amp; user\n"
+                                . "/info @user — informasi lengkap anggota (alias: /whois)\n"
+                                . "/stats — statistik aktivitas grup\n"
+                                . "/adminlist — daftar admin di grup\n"
+                                . "/warns — cek jumlah peringatan saya\n"
+                                . "/notes — daftar catatan tersimpan di grup\n"
+                                . "/report — laporkan pesan ke admin (reply pesan)\n"
+                                . "/checkperms — cek izin bot di grup\n"
+                                . "/cekverif [@user|ID] — cek data verifikasi kontak &amp; lokasi (admin)\n"
+                                . "/features — daftar fitur lengkap bot (alias: /fitur)\n\n",
+    'help.admin'              => "<b>━ 🛡️ Perintah Admin ━</b>\n"
+                                . "/ban @user — ban permanen\n"
+                                . "/tban @user 1d — ban sementara (contoh: 30m, 2h, 7d)\n"
+                                . "/unban @user — cabut ban\n"
+                                . "/kick @user — keluarkan dari grup\n"
+                                . "/mute @user [durasi] — bisukan permanen atau sementara (1h, 30m)\n"
+                                . "/unmute @user — cabut bisukan\n"
+                                . "/warn @user — beri peringatan\n"
+                                . "/unwarn @user — hapus satu peringatan (alias: /rmwarn)\n"
+                                . "/clearwarns @user — hapus semua peringatan\n"
+                                . "/promote @user — jadikan admin\n"
+                                . "/demote @user — copot dari jabatan admin\n"
+                                . "/settitle @user judul — atur judul khusus admin\n"
+                                . "/pin — pin pesan (reply ke pesan)\n"
+                                . "/unpin — lepas pin pesan\n"
+                                . "/unpinall — lepas semua pin\n"
+                                . "/del — hapus pesan (reply ke pesan, alias: /delete)\n"
+                                . "/purge — hapus massal (reply pesan awal, atau /purge @username)\n"
+                                . "/clearall — hapus semua pesan terbaru grup (maks 4.000 pesan / 48 jam)\n"
+                                . "/slowmode 30 — atur slowmode detik (0 = nonaktif)\n"
+                                . "/tagall — mention semua anggota grup\n"
+                                . "/kickbots — keluarkan semua bot lain dari grup\n"
+                                . "/cleandel — keluarkan akun yang sudah dihapus (Deleted Account)\n\n",
+    'help.lock'               => "<b>━ 🔒 Kunci Konten ━</b>\n"
+                                . "/lock &lt;jenis&gt; — kunci jenis konten tertentu\n"
+                                . "Jenis: <code>sticker</code>, <code>gif</code>, <code>media</code>, <code>voice</code>, <code>game</code>, <code>poll</code>, <code>forward</code>\n"
+                                . "/unlock &lt;jenis&gt; — buka kunci konten tertentu\n"
+                                . "/locks — tampilkan status semua kunci\n\n",
+    'help.note'               => "<b>━ 📝 Catatan (Notes) ━</b>\n"
+                                . "/save kata teks — simpan catatan (alias: /note)\n"
+                                . "/get kata — ambil catatan berdasarkan kata kunci\n"
+                                . "/notes — tampilkan semua catatan grup\n"
+                                . "/clear kata — hapus catatan (alias: /clearnote)\n"
+                                . "Atau kirim <code>#kata</code> langsung di grup untuk memanggil catatan\n\n",
+    'help.filter'             => "<b>━ 🔁 Auto-Filter &amp; Kata Terlarang ━</b>\n"
+                                . "/filter kata respons — tambah filter auto-reply\n"
+                                . "/filters — tampilkan semua filter aktif\n"
+                                . "/stop kata — hapus filter (alias: /rmfilter)\n"
+                                . "/banword kata — tambah kata terlarang (alias: /addword)\n"
+                                . "/unbanword kata — hapus kata terlarang (alias: /rmword)\n"
+                                . "/banwords — tampilkan daftar kata terlarang\n\n",
+    'help.violation'          => "<b>━ ⚖️ Poin Sanksi ━</b>\n"
+                                . "/vpoints @user — cek poin pelanggaran (alias: /poin)\n"
+                                . "/resetvp @user — reset poin ke 0 (alias: /resetpoin)\n"
+                                . "/topviolators — daftar pelanggar terbanyak (alias: /violators)\n\n",
+    'help.sang_mata'          => "<b>━ 👁️ Sang Mata ━</b>\n"
+                                . "/sangmata @user — riwayat perubahan username &amp; nama\n"
+                                . "Alias: /cekun, /usernamehistory\n"
+                                . "(aktifkan di /settings untuk notifikasi otomatis)\n\n",
+    'help.votekick'           => "<b>━ 🗳️ Vote Kick ━</b>\n"
+                                . "/votekick @user alasan — ajukan vote kick anggota (alias: /vkick)\n"
+                                . "/cancelvotekick @user — batalkan sesi vote kick (alias: /cancelvo)\n\n",
+    'help.ai'                 => "<b>━ 🤖 Asisten AI (Gemini &amp; DeepSeek) ━</b>\n"
+                                . "/ai pertanyaan — tanya AI (alias: /tanya, /ask; reply pesan untuk analisis)\n"
+                                . "/resetai — hapus riwayat percakapan AI (alias: /clearai)\n"
+                                . "/translate &lt;bahasa&gt; &lt;teks&gt; — terjemahkan teks (alias: /terjemahkan, /tr; bisa reply)\n"
+                                . "/detect &lt;teks&gt; — deteksi bahasa &amp; asal teks (alias: /deteksi; bisa reply)\n"
+                                . "/summarize &lt;teks&gt; — ringkas teks/berita panjang (alias: /ringkas, /tldr; bisa reply)\n\n"
+                                . "<b>📸 Gambar AI (hanya di chat pribadi)</b>\n"
+                                . "/imagine deskripsi — buat gambar AI (alias: /gambar, /buatgambar, /imgai)\n"
+                                . "/edit instruksi — edit foto AI (kirim foto+caption atau reply foto; alias: /editgambar, /editimg)\n\n",
+    'help.tools'              => "<b>━ 🛠️ Utilitas &amp; Tools ━</b>\n"
+                                . "/run &lt;bahasa&gt;\\n&lt;kode&gt; — eksekusi kode 35+ bahasa via Judge0 CE (Python, JS, TS, PHP, Go, Rust, C/C++, Java, SQL, dll.)\n"
+                                . "/price &lt;koin&gt; [mata_uang] — cek harga crypto live (alias: /harga, /crypto)\n"
+                                . "/setlang — ubah bahasa bot (Indonesia / English)\n"
+                                . "/features — lihat fitur lengkap bot (alias: /fitur)\n\n",
+    'help.settings'           => "<b>━ ⚙️ Pengaturan Grup ━</b>\n"
+                                . "/settings — buka panel pengaturan inline lengkap (di grup atau chat pribadi via /settings &amp; /mygroupsettings)\n"
+                                . "/setrules teks — atur peraturan grup\n"
+                                . "/setwelcome teks — atur pesan sambutan anggota baru\n"
+                                . "/setgoodbye teks — atur pesan perpisahan\n"
+                                . "/setlogchannel — atur channel log aktivitas\n"
+                                . "/invitelink — dapatkan link undangan grup\n"
+                                . "/ro — aktif/nonaktifkan mode readonly (alias: /readonly)\n"
+                                . "/setlang — ubah bahasa grup/bot\n"
+                                . "<i>Tips Admin: Pesan dengan tagar #pengumuman / #announcement otomatis di-pin bot!</i>\n\n",
+    'help.sa'                 => "<b>━ 🔐 Perintah Superadmin ━</b>\n"
+                                . "/sa — buka Panel Superadmin inline (alias: /superadmin)\n"
+                                . "/sainfo — statistik global bot (alias: /botstat)\n"
+                                . "/ping — cek respons &amp; latensi bot\n"
+                                . "/sysinfo — info server/VPS/CPU/RAM/disk (alias: /serverinfo, /hostinfo, /vpsinfo)\n"
+                                . "/gban ID alasan — global ban di semua grup\n"
+                                . "/ungban ID — cabut global ban\n"
+                                . "/gbanlist — daftar global ban\n"
+                                . "/massban ID1 ID2 ... — global ban massal\n"
+                                . "/cleargban — hapus semua global ban (Owner)\n"
+                                . "/broadcast — kirim pesan ke semua grup (+ antrian jadwal di panel SA)\n"
+                                . "/announce teks — kirim pengumuman resmi ke semua grup\n"
+                                . "/lookup @user|ID — cari riwayat &amp; status user (alias: /cariuser)\n"
+                                . "/backup — unduh backup database SQLite\n"
+                                . "/logs [n] — lihat log aktivitas bot (alias: /salog)\n"
+                                . "/maintenance — toggle mode maintenance\n"
+                                . "/addsa ID [catatan] — tambah Superadmin dinamis\n"
+                                . "/rmsa ID — hapus Superadmin dinamis (alias: /removesa)\n"
+                                . "/salist — daftar Superadmin\n"
+                                . "<b>🌐 Panel Layanan &amp; Hosting (SA):</b>\n"
+                                . "/email — Panel Email cPanel (IMAP/SMTP, buat akun, inbox, kirim)\n"
+                                . "/tempmail — TempMail Manager (generate, inbox, baca, hapus)\n"
+                                . "/whm — Panel WHM Server (akun, paket, DNS zone, FTP, restart service)\n"
+                                . "/cpanel — Panel cPanel Hosting (FTP, MySQL DB, subdomain, forwarder, cron, disk, AutoSSL)\n\n",
 
     // ======================== PM SETTINGS ========================
     'pm_settings.choose_group'   => "⚙️ <b>Settings Grup via Chat Pribadi</b>\n\nPilih grup yang ingin Anda kelola:",
@@ -70,7 +191,42 @@ return [
 
     // ======================== FEATURES ========================
     'features.title'          => "⭐ <b>Fitur Lengkap Bot</b>\n\n",
-    'features.list'           => "✅ Panel inline lengkap untuk admin\n✅ Welcome &amp; Goodbye + tombol kustom\n✅ Captcha matematika untuk user baru\n✅ Anti-flood (mute/kick/ban + durasi)\n✅ Anti-link + whitelist domain\n✅ Anti-spam, anti-forward, anti-bot\n✅ Anti-raid (proteksi join massal)\n✅ Sistem warn (limit &amp; aksi otomatis)\n✅ Sistem poin sanksi (akumulasi pelanggaran → kick/ban/mute)\n✅ Vote kick demokratis (1 suara per anggota, auto-eksekusi)\n✅ AI DeepSeek (multi-turn, analisis pesan, tersedia di grup &amp; private)\n✅ AI Buat Gambar (/imagine) — hasilkan foto dari deskripsi teks\n✅ Filter kata terlarang\n✅ System note (#keyword)\n✅ Lock: sticker/gif/media/voice/game/poll\n✅ Mode readonly\n✅ Log channel\n✅ Global ban lintas grup (SA)\n✅ Broadcast ke semua grup (SA)",
+    'features.list'           => "<b>🛡️ Moderasi &amp; Proteksi Grup</b>\n"
+                                . "✅ Panel inline lengkap via /settings (bisa langsung di grup atau DM)\n"
+                                . "✅ Anti-Flood (mute/kick/ban + durasi kustom)\n"
+                                . "✅ Anti-Link + Whitelist domain &amp; deteksi link tersembunyi\n"
+                                . "✅ Anti-Spam (deteksi duplikat), Anti-Forward, Anti-Bot &amp; Anti-Raid\n"
+                                . "✅ Kunci Konten: sticker, GIF, media, voice, game, poll, forward\n"
+                                . "✅ Mode Readonly (/ro), Slowmode (/slowmode), Clean Service Messages\n"
+                                . "✅ Hapus massal pesan (/purge reply &amp; per-user, /clearall 4.000 pesan)\n"
+                                . "✅ Auto-Pin otomatis saat admin kirim #pengumuman / #announcement\n"
+                                . "✅ Cek izin bot otomatis saat join &amp; via /checkperms\n\n"
+                                . "<b>🛂 Sambutan, Captcha &amp; Verifikasi</b>\n"
+                                . "✅ Welcome &amp; Goodbye kustom + tombol URL kustom\n"
+                                . "✅ Captcha Matematika (gambar via DM) &amp; Web hCaptcha (captcha_web.php)\n"
+                                . "✅ Auto-kick member yang gagal/telat menyelesaikan captcha (cron)\n"
+                                . "✅ Tombol \"Saya Setuju\" peraturan grup + Verifikasi Kontak &amp; Lokasi (/cekverif)\n\n"
+                                . "<b>⚖️ Sanksi, Vote Kick &amp; Pelacakan</b>\n"
+                                . "✅ Sistem Warn (limit &amp; aksi otomatis) + Poin Sanksi (/vpoints, /topviolators)\n"
+                                . "✅ Vote Kick demokratis (persentase/kuota suara, cooldown, auto-eksekusi)\n"
+                                . "✅ Sang Mata — lacak riwayat perubahan username &amp; notifikasi otomatis\n"
+                                . "✅ Sistem laporan pesan ke admin (/report)\n\n"
+                                . "<b>📝 Konten &amp; Catatan</b>\n"
+                                . "✅ System Note (/save, /get, /notes, #keyword) &amp; Auto-Filter respons (/filter)\n"
+                                . "✅ Filter Kata Terlarang (scan teks &amp; caption)\n"
+                                . "✅ Multi-bahasa Indonesia &amp; Inggris (/setlang), Log Channel &amp; Statistik Grup\n\n"
+                                . "<b>🤖 Asisten AI &amp; Utilitas</b>\n"
+                                . "✅ AI Chat Gemini &amp; DeepSeek multi-turn + analisis pesan reply (/ai, /resetai)\n"
+                                . "✅ Penerjemah (/translate), Deteksi Bahasa (/detect) &amp; Ringkas Teks (/summarize)\n"
+                                . "✅ Buat &amp; Edit Gambar AI via Gemini Image (/imagine, /edit di PM + kuota harian)\n"
+                                . "✅ Switcher Default Model AI Chat &amp; AI Image di Panel Superadmin\n"
+                                . "✅ Code Runner 35+ bahasa pemrograman via Judge0 CE (/run)\n"
+                                . "✅ Cek Harga Crypto live multi-mata uang via CoinGecko (/price)\n\n"
+                                . "<b>🔐 Suite Superadmin</b>\n"
+                                . "✅ Global Ban lintas grup (/gban, /massban) &amp; Pencarian User (/lookup)\n"
+                                . "✅ Broadcast Instan, Pengumuman (/announce) &amp; Antrian Broadcast Terjadwal\n"
+                                . "✅ Manajemen Superadmin dinamis, Backup DB, Logs, Sysinfo &amp; Maintenance\n"
+                                . "✅ Integrasi Panel Email cPanel (/email), TempMail (/tempmail), WHM (/whm) &amp; cPanel (/cpanel)",
 
     // ======================== LANGUAGE ========================
     'lang.panel'              => "🌐 <b>Pilih Bahasa Bot</b>\n\nBahasa aktif saat ini: <b>{current}</b>\n\nPilih bahasa yang ingin digunakan:",
@@ -254,8 +410,8 @@ return [
     'settings.vk_cooldown'        => "⏳ Cooldown per user: <b>{n} menit</b>",
     'settings.vk_cooldown_off'    => "⏳ Cooldown per user: <b>Nonaktif</b>",
     'settings.vk_howto'           => "<b>Cara kerja:</b>\nAnggota grup dapat mengajukan vote kick untuk member bermasalah. Jika jumlah suara 'Setuju' mencapai batas, bot akan langsung meng-kick user tersebut. Setiap anggota hanya bisa memberikan <b>satu suara</b> per sesi.\n\n<b>Mode Persentase:</b> Threshold dihitung otomatis berdasarkan jumlah member (cocok untuk grup besar).\n\n<b>Perintah:</b>\n<code>/votekick @user [alasan]</code> — mulai vote kick\n<code>/cancelvotekick @user</code> — batalkan sesi aktif",
-    'settings.ai_title'       => "🤖 <b>Pengaturan AI (DeepSeek)</b>",
-    'settings.ai_howto'       => "<b>Cara pakai:</b>\n<code>/ai [pertanyaan]</code> — tanya AI\nReply pesan + <code>/ai</code> — analisis pesan tersebut\n<code>/resetai</code> — hapus riwayat percakapan\n\n<b>Fitur:</b>\n• Multi-turn (ingat konteks 10 pesan terakhir per user)\n• Reply pesan untuk analisis konteks\n• Tersedia di private chat (selalu aktif)\n• Di grup: harus diaktifkan admin",
+    'settings.ai_title'       => "🤖 <b>Pengaturan AI ({provider})</b>",
+    'settings.ai_howto'       => "💬 Model Chat aktif: <b>{chat_model}</b>\n🎨 Model Gambar aktif: <b>{image_model}</b>\n\n<b>Cara pakai:</b>\n<code>/ai [pertanyaan]</code> — tanya AI\nReply pesan + <code>/ai</code> — analisis pesan tersebut\n<code>/resetai</code> — hapus riwayat percakapan\n\n<b>Fitur:</b>\n• Multi-turn (ingat konteks 10 pesan terakhir per user)\n• Reply pesan untuk analisis konteks\n• Tersedia di private chat (selalu aktif)\n• Di grup: harus diaktifkan admin",
 
     'settings.locks_title'    => "🔒 <b>Pengaturan Lock</b>",
 
@@ -875,6 +1031,16 @@ return [
     'sa.kb_maint_on'            => "🔴 Maintenance: ON",
     'sa.kb_maint_off'           => "✅ Maintenance: OFF",
     'sa.kb_img_settings'        => "🎨 Setting Gambar AI",
+    'sa.kb_ai_settings'         => "🤖 Pengaturan AI (Chat & Image)",
+    'sa.ai_settings_title'      => "🤖 <b>Pengaturan Default AI Bot</b>\n\n💬 <b>Default AI Chat:</b> {chat_label}\n   └ ID: <code>{chat_id}</code>\n\n🖼️ <b>Default AI Image:</b> {image_label}\n   └ ID: <code>{image_id}</code>\n\n🔑 <b>Status API Server:</b>\n• Gemini API: {gemini_status}\n• DeepSeek API: {deepseek_status}\n\n<i>Pilih kategori di bawah untuk mengubah AI default yang digunakan bot:</i>",
+    'sa.ai_kb_chat'             => "💬 Pilih Default AI Chat",
+    'sa.ai_kb_image'            => "🖼️ Pilih Default AI Image",
+    'sa.ai_chat_menu_title'     => "💬 <b>Pilih Default AI Chat</b>\n\nAktif saat ini: <b>{current}</b>\n\nModel yang dipilih akan digunakan untuk <code>/ai</code>, <code>/translate</code>, <code>/detect</code>, dan <code>/summarize</code>:",
+    'sa.ai_image_menu_title'    => "🖼️ <b>Pilih Default AI Image</b>\n\nAktif saat ini: <b>{current}</b>\n\nModel yang dipilih akan digunakan untuk <code>/imagine</code>, <code>/gambar</code>, dan <code>/edit</code>:",
+    'sa.ai_chat_updated'        => "✅ Default AI Chat diubah ke {label}",
+    'sa.ai_image_updated'       => "✅ Default AI Image diubah ke {label}",
+    'sa.ai_key_ok'              => "✅ Terpasang",
+    'sa.ai_key_missing'         => "⚠️ Belum diset (.env)",
     'sa.kb_verif'               => "🔐 Verifikasi Member",
     'sa.kb_cat_broadcast'       => "📢 Broadcast",
     'sa.kb_cat_stats'           => "📊 Statistik & Grup",

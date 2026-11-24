@@ -1,0 +1,13 @@
+{
+  "name": "xnoxsguard-telegram-bot",
+  "version": "3.1.0",
+  "description": "Telegram Group & Channel Management Bot (Pure PHP Backend + Node.js HTTP Runner for port 3000)",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "build": "node --check server.js",
+    "start": "node server.js",
+    "lint": "node --check server.js"
+  }
+}

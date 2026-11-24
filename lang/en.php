@@ -44,18 +44,139 @@ return [
     'start.btn_language'      => '🌐 Bahasa / Language',
 
     // ======================== HELP ========================
-    'help.title'              => "📖 <b>Command List</b>\n\n",
-    'help.general'            => "<b>━ General Commands ━</b>\n/rules — show group rules\n/me — view my status in this group\n/id — show chat &amp; user ID\n/info @user — view information about a member\n/stats — group activity statistics\n/warns — check my warning count\n/notes — list of saved group notes\n/report — report a message to admins\n\n",
-    'help.admin'              => "<b>━ Admin Commands ━</b>\n/ban @user — permanent ban\n/tban @user 1d — temporary ban (e.g. 30m, 2h, 7d)\n/unban @user — remove ban\n/kick @user — remove from group\n/mute @user — mute a user\n/mute @user 1h — temporary mute\n/unmute @user — unmute a user\n/warn @user — issue a warning\n/unwarn @user — remove one warning\n/clearwarns @user — clear all warnings\n/promote @user — promote to admin\n/demote @user — demote from admin\n/settitle @user title — set admin title\n/pin — pin a message (reply to it)\n/unpin — unpin a message\n/unpinall — unpin all messages\n/del — delete a message (reply to it)\n/purge — bulk delete messages (reply to first message)\n/clearall — delete all recent messages in the group (up to 4,000 messages, max 48h)\n/slowmode 30 — set slow mode in seconds (0 = off)\n/tagall — mention all group members\n/kickbots — remove all bots from the group\n/cleandel — remove members with deleted accounts\n\n",
-    'help.lock'               => "<b>━ Content Lock ━</b>\n/lock sticker — block sticker sending\n/lock gif — block GIF sending\n/lock media — block photo/video sending\n/lock voice — block voice message sending\n/lock game — block game sending\n/lock poll — block poll creation\n/lock forward — block forwarded messages\n/unlock [type] — unlock a specific content type\n/locks — show status of all locks\n\n",
-    'help.note'               => "<b>━ Notes ━</b>\n/save keyword text — save a note with a keyword\n/get keyword — retrieve a note by keyword\n/notes — show all saved notes in this group\n/clear keyword — delete a specific note\nOr send <code>#keyword</code> to retrieve a note\n\n",
-    'help.filter'             => "<b>━ Auto Filters ━</b>\n/filter keyword response — add an auto-reply filter\n/filters — show all active filters\n/stop keyword — remove a specific filter\n/banword word — add a banned word\n/unbanword word — remove a word from the banned list\n/banwords — show the banned word list\n\n",
-    'help.violation'          => "<b>━ Violation Points ━</b>\n/vpoints @user — check a user's violation points\n/resetvp @user — reset violation points to 0\n/topviolators — list of members with the most violations\n\n",
-    'help.sang_mata'          => "<b>━ Sang Mata ━</b>\n/sangmata @user — view username change history\n/cekun @user — alias for /sangmata\n(enable in /settings for automatic notifications)\n\n",
-    'help.votekick'           => "<b>━ Vote Kick ━</b>\n/votekick @user reason — propose a vote kick for a member\n/cancelvotekick @user — cancel an active vote kick session\n\n",
-    'help.ai'                 => "<b>━ AI Assistant ━</b>\n/ai question — ask DeepSeek AI\n/resetai — clear AI conversation history\n\n<b>📸 AI Images (private chat only)</b>\n/imagine description — generate an image with AI\n/gambar description — alias for /imagine\n/edit instruction — edit a photo (reply to a photo then send the command)\n<i>Tip: Reply to a message then type /ai to analyze it</i>\n\n",
-    'help.settings'           => "<b>━ Settings ━</b>\n/settings — open full settings panel via inline buttons\n/setrules — set group rules\n/setwelcome — set welcome message for new members\n/setgoodbye — set goodbye message for leaving members\n/setlogchannel — set activity log channel\n/invitelink — get group invite link\n/ro — toggle readonly mode on or off\n/setlang — change bot language\n\n",
-    'help.sa'                 => "<b>━ Superadmin ━</b>\n/sa — open superadmin panel\n/gban ID reason — globally ban a user across all groups\n/ungban ID — remove global ban\n/gbanlist — show global ban list\n/broadcast — send a message to all groups\n/ping — check bot response and latency\n/sainfo — superadmin information\n/backup — backup bot database\n/logs — view bot activity logs\n/lookup — search for user info\n/maintenance — toggle maintenance mode on or off\n/addsa ID — add a new superadmin\n/rmsa ID — remove a superadmin\n/salist — show superadmin list\n/massban — mass ban users\n/cleargban — clear all global bans\n/announce — send an official announcement to all groups",
+    'help.title'              => "📖 <b>Bot Command List</b>\n\n",
+    'help.overview'           => "Choose a category below or send <code>/help [category]</code> (e.g. <code>/help ai</code>, <code>/help admin</code>):\n\n"
+                                . "📋 <b>General</b> (<code>general</code>): /rules, /me, /id, /info, /stats, /adminlist, /warns, /notes, /report, /checkperms, /cekverif\n"
+                                . "🛡️ <b>Admin</b> (<code>admin</code>): /ban, /tban, /unban, /kick, /mute, /unmute, /warn, /unwarn, /clearwarns, /promote, /demote, /settitle, /pin, /unpin, /unpinall, /del, /purge, /clearall, /slowmode, /tagall, /kickbots, /cleandel\n"
+                                . "🔒 <b>Content</b> (<code>content</code>): /lock, /unlock, /locks, /save, /get, /notes, /clear, #keyword, /filter, /filters, /stop, /banword, /unbanword, /banwords\n"
+                                . "⚖️ <b>Sanctions &amp; Spy</b> (<code>safety</code>): /vpoints, /resetvp, /topviolators, /sangmata, /cekun, /votekick, /cancelvotekick\n"
+                                . "🤖 <b>AI &amp; Tools</b> (<code>ai</code>): /ai, /resetai, /translate, /detect, /summarize, /imagine, /edit, /run, /price, /setlang, /features\n"
+                                . "⚙️ <b>Settings</b> (<code>settings</code>): /settings (group &amp; PM), /setrules, /setwelcome, /setgoodbye, /setlogchannel, /invitelink, /ro, /setlang\n",
+    'help.overview_sa'        => "🔐 <b>Superadmin</b> (<code>sa</code>): /sa, /gban, /ungban, /gbanlist, /massban, /cleargban, /broadcast, /announce, /lookup, /sainfo, /ping, /sysinfo, /backup, /logs, /maintenance, /addsa, /rmsa, /salist, /email, /tempmail, /whm, /cpanel\n",
+    'help.sa_restricted'      => '❌ Superadmin help is only accessible to Superadmins.',
+    'help.btn_overview'       => '📖 Overview',
+    'help.btn_general'        => '📋 General',
+    'help.btn_admin'          => '🛡️ Admin',
+    'help.btn_content'        => '🔒 Content & Filter',
+    'help.btn_safety'         => '⚖️ Sanctions & Spy',
+    'help.btn_ai'             => '🤖 AI & Tools',
+    'help.btn_settings'       => '⚙️ Settings',
+    'help.btn_sa'             => '🔐 Superadmin',
+    'help.btn_features'       => '⭐ Full Features',
+    'help.btn_close'          => '✖️ Close',
+    'help.general'            => "<b>━ 📋 General Commands ━</b>\n"
+                                . "/rules — show group rules\n"
+                                . "/me — view my status in this group\n"
+                                . "/id — show chat &amp; user ID\n"
+                                . "/info @user — detailed member info (alias: /whois)\n"
+                                . "/stats — group activity statistics\n"
+                                . "/adminlist — list group admins\n"
+                                . "/warns — check my warning count\n"
+                                . "/notes — list saved group notes\n"
+                                . "/report — report a message to admins (reply to message)\n"
+                                . "/checkperms — inspect bot permissions in group\n"
+                                . "/cekverif [@user|ID] — check contact &amp; location verification (admin)\n"
+                                . "/features — view full bot feature list (alias: /fitur)\n\n",
+    'help.admin'              => "<b>━ 🛡️ Admin Commands ━</b>\n"
+                                . "/ban @user — permanent ban\n"
+                                . "/tban @user 1d — temporary ban (e.g. 30m, 2h, 7d)\n"
+                                . "/unban @user — remove ban\n"
+                                . "/kick @user — remove from group\n"
+                                . "/mute @user [duration] — mute permanently or temporarily (1h, 30m)\n"
+                                . "/unmute @user — unmute a user\n"
+                                . "/warn @user — issue a warning\n"
+                                . "/unwarn @user — remove one warning (alias: /rmwarn)\n"
+                                . "/clearwarns @user — clear all warnings\n"
+                                . "/promote @user — promote to admin\n"
+                                . "/demote @user — demote from admin\n"
+                                . "/settitle @user title — set custom admin title\n"
+                                . "/pin — pin a message (reply to it)\n"
+                                . "/unpin — unpin a message\n"
+                                . "/unpinall — unpin all messages\n"
+                                . "/del — delete a message (reply to it, alias: /delete)\n"
+                                . "/purge — bulk delete (reply to start message, or /purge @username)\n"
+                                . "/clearall — delete recent group messages (up to 4,000 msgs / 48h)\n"
+                                . "/slowmode 30 — set slow mode in seconds (0 = off)\n"
+                                . "/tagall — mention all group members\n"
+                                . "/kickbots — remove all other bots from the group\n"
+                                . "/cleandel — remove Deleted Accounts from group\n\n",
+    'help.lock'               => "<b>━ 🔒 Content Lock ━</b>\n"
+                                . "/lock &lt;type&gt; — block a content type\n"
+                                . "Types: <code>sticker</code>, <code>gif</code>, <code>media</code>, <code>voice</code>, <code>game</code>, <code>poll</code>, <code>forward</code>\n"
+                                . "/unlock &lt;type&gt; — unlock a content type\n"
+                                . "/locks — show status of all locks\n\n",
+    'help.note'               => "<b>━ 📝 Notes ━</b>\n"
+                                . "/save keyword text — save a note (alias: /note)\n"
+                                . "/get keyword — retrieve a note by keyword\n"
+                                . "/notes — show all saved notes in this group\n"
+                                . "/clear keyword — delete a note (alias: /clearnote)\n"
+                                . "Or send <code>#keyword</code> directly in the group to trigger a note\n\n",
+    'help.filter'             => "<b>━ 🔁 Auto Filters &amp; Banned Words ━</b>\n"
+                                . "/filter keyword response — add an auto-reply filter\n"
+                                . "/filters — show all active filters\n"
+                                . "/stop keyword — remove a filter (alias: /rmfilter)\n"
+                                . "/banword word — add a banned word (alias: /addword)\n"
+                                . "/unbanword word — remove a banned word (alias: /rmword)\n"
+                                . "/banwords — show the banned word list\n\n",
+    'help.violation'          => "<b>━ ⚖️ Violation Points ━</b>\n"
+                                . "/vpoints @user — check violation points (alias: /poin)\n"
+                                . "/resetvp @user — reset points to 0 (alias: /resetpoin)\n"
+                                . "/topviolators — top violators list (alias: /violators)\n\n",
+    'help.sang_mata'          => "<b>━ 👁️ Sang Mata ━</b>\n"
+                                . "/sangmata @user — view username &amp; name change history\n"
+                                . "Aliases: /cekun, /usernamehistory\n"
+                                . "(enable in /settings for automatic notifications)\n\n",
+    'help.votekick'           => "<b>━ 🗳️ Vote Kick ━</b>\n"
+                                . "/votekick @user reason — start a member vote kick (alias: /vkick)\n"
+                                . "/cancelvotekick @user — cancel active vote kick (alias: /cancelvo)\n\n",
+    'help.ai'                 => "<b>━ 🤖 AI Assistant (Gemini &amp; DeepSeek) ━</b>\n"
+                                . "/ai question — ask AI (aliases: /tanya, /ask; reply to analyze a message)\n"
+                                . "/resetai — clear AI chat history (alias: /clearai)\n"
+                                . "/translate &lt;lang&gt; &lt;text&gt; — translate text (aliases: /terjemahkan, /tr; reply supported)\n"
+                                . "/detect &lt;text&gt; — detect language &amp; origin (alias: /deteksi; reply supported)\n"
+                                . "/summarize &lt;text&gt; — summarize long text (aliases: /ringkas, /tldr; reply supported)\n\n"
+                                . "<b>📸 AI Images (private chat only)</b>\n"
+                                . "/imagine prompt — generate AI image (aliases: /gambar, /buatgambar, /imgai)\n"
+                                . "/edit instruction — edit photo with AI (send photo+caption or reply; aliases: /editgambar, /editimg)\n\n",
+    'help.tools'              => "<b>━ 🛠️ Utilities &amp; Tools ━</b>\n"
+                                . "/run &lt;lang&gt;\\n&lt;code&gt; — run code in 35+ languages via Judge0 CE (Python, JS, TS, PHP, Go, Rust, C/C++, Java, SQL, etc.)\n"
+                                . "/price &lt;coin&gt; [currency] — live crypto price checker (aliases: /harga, /crypto)\n"
+                                . "/setlang — change bot language (Indonesia / English)\n"
+                                . "/features — view full bot feature list (alias: /fitur)\n\n",
+    'help.settings'           => "<b>━ ⚙️ Group Settings ━</b>\n"
+                                . "/settings — open full inline settings panel (in group or PM via /settings &amp; /mygroupsettings)\n"
+                                . "/setrules text — set group rules\n"
+                                . "/setwelcome text — set welcome message\n"
+                                . "/setgoodbye text — set goodbye message\n"
+                                . "/setlogchannel — set activity log channel\n"
+                                . "/invitelink — get group invite link\n"
+                                . "/ro — toggle readonly mode (alias: /readonly)\n"
+                                . "/setlang — change group/bot language\n"
+                                . "<i>Admin Tip: Messages containing #pengumuman / #announcement are auto-pinned!</i>\n\n",
+    'help.sa'                 => "<b>━ 🔐 Superadmin Commands ━</b>\n"
+                                . "/sa — open inline Superadmin Panel (alias: /superadmin)\n"
+                                . "/sainfo — global bot statistics (alias: /botstat)\n"
+                                . "/ping — check bot latency &amp; response\n"
+                                . "/sysinfo — server/VPS/CPU/RAM/disk info (aliases: /serverinfo, /hostinfo, /vpsinfo)\n"
+                                . "/gban ID reason — global ban across all groups\n"
+                                . "/ungban ID — remove global ban\n"
+                                . "/gbanlist — show global ban list\n"
+                                . "/massban ID1 ID2 ... — mass global ban\n"
+                                . "/cleargban — clear all global bans (Owner)\n"
+                                . "/broadcast — broadcast to all groups (+ scheduled queue in SA panel)\n"
+                                . "/announce text — official announcement to all groups\n"
+                                . "/lookup @user|ID — look up user history &amp; status (alias: /cariuser)\n"
+                                . "/backup — download SQLite database backup\n"
+                                . "/logs [n] — view bot activity logs (alias: /salog)\n"
+                                . "/maintenance — toggle maintenance mode\n"
+                                . "/addsa ID [note] — add dynamic Superadmin\n"
+                                . "/rmsa ID — remove dynamic Superadmin (alias: /removesa)\n"
+                                . "/salist — list all Superadmins\n"
+                                . "<b>🌐 Service &amp; Hosting Panels (SA):</b>\n"
+                                . "/email — cPanel Email Manager (IMAP/SMTP, create, inbox, compose)\n"
+                                . "/tempmail — TempMail Manager (generate, inbox, read, delete)\n"
+                                . "/whm — WHM Server Panel (accounts, packages, DNS zones, FTP, restart services)\n"
+                                . "/cpanel — cPanel Hosting Panel (FTP, MySQL DB, subdomains, forwarders, cron, disk, AutoSSL)\n\n",
 
     // ======================== PM SETTINGS ========================
     'pm_settings.choose_group'   => "⚙️ <b>Group Settings via Private Chat</b>\n\nSelect the group you want to manage:",
@@ -70,7 +191,42 @@ return [
 
     // ======================== FEATURES ========================
     'features.title'          => "⭐ <b>Full Feature List</b>\n\n",
-    'features.list'           => "✅ Full inline panel for admins\n✅ Welcome &amp; Goodbye + custom buttons\n✅ Math captcha for new members\n✅ Anti-flood (mute/kick/ban + duration)\n✅ Anti-link + domain whitelist\n✅ Anti-spam, anti-forward, anti-bot\n✅ Anti-raid (mass-join protection)\n✅ Warn system (limit &amp; auto action)\n✅ Violation point system (accumulated violations → kick/ban/mute)\n✅ Democratic vote kick (1 vote per member, auto-execution)\n✅ DeepSeek AI (multi-turn, message analysis, available in groups &amp; private)\n✅ AI Image Generation (/imagine) — create photos from text description\n✅ Banned word filter\n✅ Note system (#keyword)\n✅ Lock: sticker/gif/media/voice/game/poll\n✅ Readonly mode\n✅ Log channel\n✅ Global ban across groups (SA)\n✅ Broadcast to all groups (SA)",
+    'features.list'           => "<b>🛡️ Group Moderation &amp; Protection</b>\n"
+                                . "✅ Full inline /settings panel (directly in group or via private chat)\n"
+                                . "✅ Anti-Flood (mute/kick/ban + custom duration)\n"
+                                . "✅ Anti-Link + domain whitelist &amp; hidden link entity detection\n"
+                                . "✅ Anti-Spam (duplicate detection), Anti-Forward, Anti-Bot &amp; Anti-Raid\n"
+                                . "✅ Content Locks: sticker, GIF, media, voice, game, poll, forward\n"
+                                . "✅ Readonly Mode (/ro), Slowmode (/slowmode), Clean Service Messages\n"
+                                . "✅ Bulk message cleanup (/purge by reply or user, /clearall up to 4,000 msgs)\n"
+                                . "✅ Auto-Pin when admins send #pengumuman / #announcement\n"
+                                . "✅ Automatic bot permission check on join &amp; via /checkperms\n\n"
+                                . "<b>🛂 Welcome, Captcha &amp; Verification</b>\n"
+                                . "✅ Custom Welcome &amp; Goodbye messages + custom URL buttons\n"
+                                . "✅ Math Captcha (generated image in DM) &amp; Web hCaptcha (captcha_web.php)\n"
+                                . "✅ Auto-kick members who fail or time out on captcha (cron)\n"
+                                . "✅ \"I Agree\" rules confirmation button + Contact &amp; Location verification (/cekverif)\n\n"
+                                . "<b>⚖️ Sanctions, Vote Kick &amp; Tracking</b>\n"
+                                . "✅ Warn system (limit &amp; auto-action) + Violation Points (/vpoints, /topviolators)\n"
+                                . "✅ Democratic Vote Kick (count/percentage threshold, cooldown, auto-execution)\n"
+                                . "✅ Sang Mata — tracks username change history &amp; sends automatic alerts\n"
+                                . "✅ Member report system to admins (/report)\n\n"
+                                . "<b>📝 Content &amp; Notes</b>\n"
+                                . "✅ Note system (/save, /get, /notes, #keyword) &amp; Auto-Filters (/filter)\n"
+                                . "✅ Banned Word Filter (scans both messages &amp; media captions)\n"
+                                . "✅ Multi-language Indonesia &amp; English (/setlang), Log Channel &amp; Group Stats\n\n"
+                                . "<b>🤖 AI Assistant &amp; Utilities</b>\n"
+                                . "✅ Gemini AI &amp; DeepSeek multi-turn chat + reply analysis (/ai, /resetai)\n"
+                                . "✅ AI Translator (/translate), Language Detector (/detect) &amp; Summarizer (/summarize)\n"
+                                . "✅ AI Image Generation &amp; Editing via Gemini Image (/imagine, /edit in DM + daily quota)\n"
+                                . "✅ Default AI Chat &amp; AI Image model switcher in Superadmin Panel\n"
+                                . "✅ Multi-language Code Runner for 35+ languages via Judge0 CE (/run)\n"
+                                . "✅ Live multi-currency Crypto Price Checker via CoinGecko (/price)\n\n"
+                                . "<b>🔐 Superadmin Suite</b>\n"
+                                . "✅ Cross-group Global Ban (/gban, /massban) &amp; User Lookup (/lookup)\n"
+                                . "✅ Instant Broadcast, Announcements (/announce) &amp; Scheduled Broadcast Queue\n"
+                                . "✅ Dynamic Superadmin management, DB Backup, Logs, Sysinfo &amp; Maintenance Mode\n"
+                                . "✅ Integrated cPanel Email (/email), TempMail (/tempmail), WHM (/whm) &amp; cPanel (/cpanel) panels",
 
     // ======================== LANGUAGE ========================
     'lang.panel'              => "🌐 <b>Select Bot Language</b>\n\nCurrent language: <b>{current}</b>\n\nChoose a language:",
@@ -254,8 +410,8 @@ return [
     'settings.vk_cooldown'        => "⏳ Per-user cooldown: <b>{n} minutes</b>",
     'settings.vk_cooldown_off'    => "⏳ Per-user cooldown: <b>Disabled</b>",
     'settings.vk_howto'           => "<b>How it works:</b>\nGroup members can propose a vote kick for a problematic member. If the number of 'Agree' votes reaches the threshold, the bot will kick the user immediately. Each member can only cast <b>one vote</b> per session.\n\n<b>Percentage Mode:</b> Threshold is automatically calculated based on member count (ideal for large groups).\n\n<b>Commands:</b>\n<code>/votekick @user [reason]</code> — start vote kick\n<code>/cancelvotekick @user</code> — cancel active session",
-    'settings.ai_title'       => "🤖 <b>AI Settings (DeepSeek)</b>",
-    'settings.ai_howto'       => "<b>Usage:</b>\n<code>/ai [question]</code> — ask the AI\nReply a message + <code>/ai</code> — analyze that message\n<code>/resetai</code> — clear conversation history\n\n<b>Features:</b>\n• Multi-turn (remembers last 10 messages per user)\n• Reply message for context analysis\n• Always available in private chat\n• In groups: must be enabled by admin",
+    'settings.ai_title'       => "🤖 <b>AI Settings ({provider})</b>",
+    'settings.ai_howto'       => "💬 Active Chat Model: <b>{chat_model}</b>\n🎨 Active Image Model: <b>{image_model}</b>\n\n<b>Usage:</b>\n<code>/ai [question]</code> — ask the AI\nReply a message + <code>/ai</code> — analyze that message\n<code>/resetai</code> — clear conversation history\n\n<b>Features:</b>\n• Multi-turn (remembers last 10 messages per user)\n• Reply message for context analysis\n• Always available in private chat\n• In groups: must be enabled by admin",
 
     'settings.locks_title'    => "🔒 <b>Lock Settings</b>",
 
@@ -875,6 +1031,16 @@ return [
     'sa.kb_maint_on'            => "🔴 Maintenance: ON",
     'sa.kb_maint_off'           => "✅ Maintenance: OFF",
     'sa.kb_img_settings'        => "🎨 AI Image Settings",
+    'sa.kb_ai_settings'         => "🤖 AI Settings (Chat & Image)",
+    'sa.ai_settings_title'      => "🤖 <b>Default Bot AI Settings</b>\n\n💬 <b>Default AI Chat:</b> {chat_label}\n   └ ID: <code>{chat_id}</code>\n\n🖼️ <b>Default AI Image:</b> {image_label}\n   └ ID: <code>{image_id}</code>\n\n🔑 <b>Server API Status:</b>\n• Gemini API: {gemini_status}\n• DeepSeek API: {deepseek_status}\n\n<i>Select an option below to configure the default AI models used by the bot:</i>",
+    'sa.ai_kb_chat'             => "💬 Choose Default AI Chat",
+    'sa.ai_kb_image'            => "🖼️ Choose Default AI Image",
+    'sa.ai_chat_menu_title'     => "💬 <b>Select Default AI Chat</b>\n\nCurrently active: <b>{current}</b>\n\nThe selected model is used for <code>/ai</code>, <code>/translate</code>, <code>/detect</code>, and <code>/summarize</code>:",
+    'sa.ai_image_menu_title'    => "🖼️ <b>Select Default AI Image</b>\n\nCurrently active: <b>{current}</b>\n\nThe selected model is used for <code>/imagine</code>, <code>/gambar</code>, and <code>/edit</code>:",
+    'sa.ai_chat_updated'        => "✅ Default AI Chat changed to {label}",
+    'sa.ai_image_updated'       => "✅ Default AI Image changed to {label}",
+    'sa.ai_key_ok'              => "✅ Configured",
+    'sa.ai_key_missing'         => "⚠️ Not set (.env)",
     'sa.kb_verif'               => "🔐 Member Verification",
     'sa.kb_cat_broadcast'       => "📢 Broadcast",
     'sa.kb_cat_stats'           => "📊 Stats & Groups",

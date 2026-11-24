@@ -59,3 +59,12 @@ define('WHM_PORT',  2087);
 define('WHM_USER',  '');
 define('WHM_PASS',  '');
 define('WHM_TOKEN', ''); // WHM API Token (disarankan, lebih aman dari password)
+
+// ================================================================
+//  KONFIGURASI AI (Gemini & DeepSeek Official API)
+//  API Key dibaca dari environment variable server (.env / hosting)
+// ================================================================
+define('GEMINI_API_KEY',   getenv('GEMINI_API_KEY')   ?: ($_ENV['GEMINI_API_KEY']   ?? ''));
+define('DEEPSEEK_API_KEY', getenv('DEEPSEEK_API_KEY') ?: ($_ENV['DEEPSEEK_API_KEY'] ?? ''));
+define('DEEPSEEK_API_URL', getenv('DEEPSEEK_API_URL') ?: ($_ENV['DEEPSEEK_API_URL'] ?? 'https://api.deepseek.com/v1/chat/completions'));
+

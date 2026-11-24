@@ -476,6 +476,19 @@ class Database {
                 PRIMARY KEY (user_id, date)
             )");
         } catch (PDOException $e) {}
+
+        // Seed default AI & image settings jika belum ada
+        $defaults = [
+            'default_ai_chat'  => 'gemini-4-hydrogen',
+            'default_ai_image' => 'gemini-3.1-flash-lite-image',
+            'img_daily_limit'  => '5',
+        ];
+        foreach ($defaults as $k => $v) {
+            try {
+                $stmt = $this->db->prepare("INSERT OR IGNORE INTO bot_settings (key, value) VALUES (?, ?)");
+                $stmt->execute([$k, $v]);
+            } catch (PDOException $e) {}
+        }
     }
 
     // Buat index untuk query yang sering dipakai (idempotent - IF NOT EXISTS)
@@ -990,7 +1003,7 @@ class Database {
 
     public function getBotSetting(string $key, string $default = ''): string {
         $r = $this->fetchOne("SELECT value FROM bot_settings WHERE key = ?", [$key]);
-        return $r ? (string)$r['value'] : $default;
+        return ($r !== null && $r['value'] !== '') ? (string)$r['value'] : $default;
     }
 
     public function setBotSetting(string $key, string $value): void {
@@ -998,6 +1011,22 @@ class Database {
             "INSERT OR REPLACE INTO bot_settings (key, value) VALUES (?, ?)",
             [$key, $value]
         );
+    }
+
+    public function getDefaultAiChat(): string {
+        return $this->getBotSetting('default_ai_chat', 'gemini-4-hydrogen');
+    }
+
+    public function setDefaultAiChat(string $model): void {
+        $this->setBotSetting('default_ai_chat', $model);
+    }
+
+    public function getDefaultAiImage(): string {
+        return $this->getBotSetting('default_ai_image', 'gemini-3.1-flash-lite-image');
+    }
+
+    public function setDefaultAiImage(string $model): void {
+        $this->setBotSetting('default_ai_image', $model);
     }
 
     /**

@@ -175,18 +175,23 @@ class TelegramBot {
      * Kirim foto ke Telegram menggunakan multipart/form-data.
      * $imageData: binary PNG/JPEG string.
      */
-    public static function sendPhoto(int $chatId, string $imageData, array $extra = []): array {
-        $tmp = tempnam(sys_get_temp_dir(), 'tgcap_') . '.png';
+    public static function sendPhoto(int $chatId, string $imageData, array $extra = [], string $mimeType = 'image/png'): array {
+        $ext = match ($mimeType) {
+            'image/jpeg', 'image/jpg' => 'jpg',
+            'image/webp'              => 'webp',
+            default                   => 'png',
+        };
+        $tmp = tempnam(sys_get_temp_dir(), 'tgimg_') . '.' . $ext;
         file_put_contents($tmp, $imageData);
 
-        $params = array_merge(['chat_id' => $chatId, 'photo' => new CURLFile($tmp, 'image/png', 'captcha.png')], $extra);
+        $params = array_merge(['chat_id' => $chatId, 'photo' => new CURLFile($tmp, $mimeType, 'image.' . $ext)], $extra);
 
         $ch = curl_init(API_URL . 'sendPhoto');
         curl_setopt_array($ch, [
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => $params,
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 20,
+            CURLOPT_TIMEOUT        => 30,
             CURLOPT_SSL_VERIFYPEER => false,
         ]);
         $res = curl_exec($ch);
@@ -2587,8 +2592,17 @@ class TelegramBot {
                 self::send($this->chatId, $this->txtStart(), ['reply_markup' => json_encode($this->kbMain())]);
                 break;
             }
-            case 'help':
-                self::send($this->chatId, $this->txtHelp(), ['reply_markup' => json_encode(['inline_keyboard' => [[['text' => $this->t('kb.back'), 'callback_data' => 'menu_main']]]])]);
+            case 'help': {
+                $cat = $this->resolveHelpCategory($args[0] ?? 'overview');
+                self::send($this->chatId, $this->txtHelp($cat), ['reply_markup' => json_encode($this->kbHelp($cat, true))]);
+                break;
+            }
+            case 'features':
+            case 'fitur':
+                self::send($this->chatId, $this->txtFeatures(), ['reply_markup' => json_encode(['inline_keyboard' => [
+                    [['text' => $this->t('start.btn_help'), 'callback_data' => 'menu_help'],
+                     ['text' => $this->t('kb.back'),        'callback_data' => 'menu_main']],
+                ]])]);
                 break;
 
             // ===== PM SETTINGS: PILIH GRUP =====
@@ -2870,16 +2884,28 @@ class TelegramBot {
             case 'tanya':
             case 'ask': {
                 $prompt = trim(implode(' ', $args));
-                if (!$prompt) {
+                $replyCtx = '';
+                if (!empty($msg['reply_to_message']['text'])) {
+                    $replyCtx = $msg['reply_to_message']['text'];
+                }
+                if (!$prompt && !$replyCtx) {
                     self::send($this->chatId, $this->t('ai.usage'));
                     break;
                 }
+                $fullPrompt = $prompt;
+                if ($replyCtx && $prompt) {
+                    $fullPrompt = $this->t('ai.reply_context', ['ctx' => $replyCtx, 'prompt' => $prompt]);
+                } elseif ($replyCtx) {
+                    $fullPrompt = $this->t('ai.reply_only', ['ctx' => $replyCtx]);
+                }
                 self::api('sendChatAction', ['chat_id' => $this->chatId, 'action' => 'typing']);
-                $history = $this->db->getAiHistory($this->chatId, $this->userId);
-                $deepseek = new DeepSeek();
-                $reply = $deepseek->chat($prompt, $history);
-                $this->db->addAiMessage($this->chatId, $this->userId, 'user', $prompt);
-                $this->db->addAiMessage($this->chatId, $this->userId, 'assistant', $reply);
+                $history   = $this->db->getAiHistory($this->chatId, $this->userId);
+                $chatModel = AiService::getActiveChatModel($this->db);
+                $reply     = AiService::chat($fullPrompt, $history, $chatModel);
+                if (strpos($reply, '❌') !== 0) {
+                    $this->db->addAiMessage($this->chatId, $this->userId, 'user', $fullPrompt);
+                    $this->db->addAiMessage($this->chatId, $this->userId, 'assistant', $reply);
+                }
                 sendAiReply($this->chatId, "🤖 " . $reply);
                 break;
             }
@@ -2904,11 +2930,11 @@ class TelegramBot {
                     break;
                 }
                 self::api('sendChatAction', ['chat_id' => $this->chatId, 'action' => 'typing']);
-                $prompt = "Translate the following text to {$targetLang}. Reply ONLY with the translated text, no explanation, no extra commentary:\n\n{$textToTranslate}";
-                $deepseek = new DeepSeek();
-                $result = $deepseek->chat($prompt, []);
+                $prompt    = "Translate the following text to {$targetLang}. Reply ONLY with the translated text, no explanation, no extra commentary:\n\n{$textToTranslate}";
+                $chatModel = AiService::getActiveChatModel($this->db);
+                $result    = AiService::chat($prompt, [], $chatModel);
                 if (strpos($result, '❌') === 0) {
-                    self::send($this->chatId, $this->t('translate.error'));
+                    self::send($this->chatId, $result);
                     break;
                 }
                 $reply = str_replace(['{lang}', '{result}'], [htmlspecialchars($targetLang), $result], $this->t('translate.result'));
@@ -2927,11 +2953,11 @@ class TelegramBot {
                     break;
                 }
                 self::api('sendChatAction', ['chat_id' => $this->chatId, 'action' => 'typing']);
-                $prompt = "Detect the language of the following text. Reply with: the language name (in both English and the local name), the language code (ISO 639-1), and a short confidence note. Format:\nLanguage: [name in English] / [local name]\nCode: [ISO code]\nConfidence: [high/medium/low]\n\nText:\n{$textToDetect}";
-                $deepseek = new DeepSeek();
-                $result = $deepseek->chat($prompt, []);
+                $prompt    = "Detect the language of the following text. Reply with: the language name (in both English and the local name), the language code (ISO 639-1), and a short confidence note. Format:\nLanguage: [name in English] / [local name]\nCode: [ISO code]\nConfidence: [high/medium/low]\n\nText:\n{$textToDetect}";
+                $chatModel = AiService::getActiveChatModel($this->db);
+                $result    = AiService::chat($prompt, [], $chatModel);
                 if (strpos($result, '❌') === 0) {
-                    self::send($this->chatId, $this->t('detect.error'));
+                    self::send($this->chatId, $result);
                     break;
                 }
                 $reply = str_replace('{result}', $result, $this->t('detect.result'));
@@ -2951,11 +2977,11 @@ class TelegramBot {
                     break;
                 }
                 self::api('sendChatAction', ['chat_id' => $this->chatId, 'action' => 'typing']);
-                $prompt = "Summarize the following text concisely. Use the same language as the source text. Present key points clearly using bullet points if appropriate. Reply ONLY with the summary, no preamble:\n\n{$textToSummarize}";
-                $deepseek = new DeepSeek();
-                $result = $deepseek->chat($prompt, []);
+                $prompt    = "Summarize the following text concisely. Use the same language as the source text. Present key points clearly using bullet points if appropriate. Reply ONLY with the summary, no preamble:\n\n{$textToSummarize}";
+                $chatModel = AiService::getActiveChatModel($this->db);
+                $result    = AiService::chat($prompt, [], $chatModel);
                 if (strpos($result, '❌') === 0) {
-                    self::send($this->chatId, $this->t('summarize.error'));
+                    self::send($this->chatId, $result);
                     break;
                 }
                 $reply = str_replace('{result}', $result, $this->t('summarize.result'));
@@ -2987,25 +3013,25 @@ class TelegramBot {
                 }
 
                 self::api('sendChatAction', ['chat_id' => $this->chatId, 'action' => 'upload_photo']);
-                $waitMsg = self::send($this->chatId, $this->t('img.generating'));
+                $waitMsg   = self::send($this->chatId, $this->t('img.generating'));
                 $waitMsgId = $waitMsg['result']['message_id'] ?? null;
-                $imgGen  = new AiImageGen();
-                $result  = $imgGen->generate($prompt);
+                $imgModel  = AiService::getActiveImageModel($this->db);
+                $result    = AiService::generateImage($prompt, $imgModel);
                 if ($waitMsgId) {
                     self::api('deleteMessage', ['chat_id' => $this->chatId, 'message_id' => $waitMsgId]);
                 }
-                if (strpos($result, '❌') === 0) {
-                    self::send($this->chatId, $result);
+                if (!($result['ok'] ?? false)) {
+                    self::send($this->chatId, $result['error'] ?? $this->t('img.failed'));
                     break;
                 }
-                $imgData = $imgGen->downloadImage($result);
                 $caption = Lang::t('img.caption', ['prompt' => htmlspecialchars(mb_substr($prompt, 0, 200))]);
-                if ($imgData) {
-                    $this->db->incrementImgUsage($this->userId);
-                    self::sendPhoto($this->chatId, $imgData, ['caption' => $caption, 'parse_mode' => 'HTML']);
-                } else {
-                    self::send($this->chatId, $this->t('img.failed'));
-                }
+                $this->db->incrementImgUsage($this->userId);
+                self::sendPhoto(
+                    $this->chatId,
+                    $result['data'],
+                    ['caption' => $caption, 'parse_mode' => 'HTML'],
+                    $result['mime'] ?? 'image/png'
+                );
                 break;
             }
 
@@ -3016,9 +3042,6 @@ class TelegramBot {
                 $curMsg      = $this->message;
                 $repMsg      = $curMsg['reply_to_message'] ?? null;
 
-                // Tentukan sumber foto:
-                // Prioritas 1 — foto di pesan saat ini (user kirim foto + caption "/edit instruksi")
-                // Prioritas 2 — reply ke pesan foto lain
                 $hasPhotoInCurrent = !empty($curMsg['photo']) || !empty($curMsg['document']);
                 $hasPhotoInReply   = !empty($repMsg) && (!empty($repMsg['photo']) || !empty($repMsg['document']));
 
@@ -3031,20 +3054,19 @@ class TelegramBot {
                     break;
                 }
 
-                // Tentukan sumber foto dan ambil file_id terbesar
                 $sourceMsg = $hasPhotoInCurrent ? $curMsg : $repMsg;
+                $mimeHint  = '';
                 if (!empty($sourceMsg['photo'])) {
-                    // photo adalah array ukuran; elemen terakhir = resolusi tertinggi
                     $photoSizes = $sourceMsg['photo'];
                     $fileId     = end($photoSizes)['file_id'] ?? null;
                 } elseif (!empty($sourceMsg['document'])) {
-                    // Validasi bahwa dokumen adalah gambar (bukan PDF, ZIP, dll.)
                     $mime = $sourceMsg['document']['mime_type'] ?? '';
                     if (strpos($mime, 'image/') !== 0) {
                         self::send($this->chatId, $this->t('img.edit_not_image'));
                         break;
                     }
-                    $fileId = $sourceMsg['document']['file_id'] ?? null;
+                    $mimeHint = $mime;
+                    $fileId   = $sourceMsg['document']['file_id'] ?? null;
                 } else {
                     $fileId = null;
                 }
@@ -3054,15 +3076,14 @@ class TelegramBot {
                     break;
                 }
 
-                // Download foto dari Telegram
                 $fileInfo = self::api('getFile', ['file_id' => $fileId]);
                 $filePath = $fileInfo['result']['file_path'] ?? null;
                 if (!$filePath) {
                     self::send($this->chatId, $this->t('img.failed'));
                     break;
                 }
-                $fileUrl    = 'https://api.telegram.org/file/bot' . BOT_TOKEN . '/' . $filePath;
-                $imgGen     = new AiImageGen();
+                $fileUrl     = 'https://api.telegram.org/file/bot' . BOT_TOKEN . '/' . $filePath;
+                $imgGen      = new AiImageGen();
                 $imageBinary = $imgGen->downloadImage($fileUrl);
                 if (!$imageBinary) {
                     self::send($this->chatId, $this->t('img.failed'));
@@ -3073,22 +3094,23 @@ class TelegramBot {
                 $waitMsg   = self::send($this->chatId, $this->t('img.edit_generating'));
                 $waitMsgId = $waitMsg['result']['message_id'] ?? null;
 
-                $result = $imgGen->editImage($imageBinary, $instruction);
+                $imgModel = AiService::getActiveImageModel($this->db);
+                $result   = AiService::editImage($imageBinary, $instruction, $imgModel, $mimeHint);
 
                 if ($waitMsgId) {
                     self::api('deleteMessage', ['chat_id' => $this->chatId, 'message_id' => $waitMsgId]);
                 }
-                if (strpos($result, '❌') === 0) {
-                    self::send($this->chatId, $result);
+                if (!($result['ok'] ?? false)) {
+                    self::send($this->chatId, $result['error'] ?? $this->t('img.failed'));
                     break;
                 }
-                $imgData     = $imgGen->downloadImage($result);
                 $editCaption = Lang::t('img.edit_caption', ['prompt' => htmlspecialchars(mb_substr($instruction, 0, 200))]);
-                if ($imgData) {
-                    self::sendPhoto($this->chatId, $imgData, ['caption' => $editCaption, 'parse_mode' => 'HTML']);
-                } else {
-                    self::send($this->chatId, $this->t('img.failed'));
-                }
+                self::sendPhoto(
+                    $this->chatId,
+                    $result['data'],
+                    ['caption' => $editCaption, 'parse_mode' => 'HTML'],
+                    $result['mime'] ?? 'image/png'
+                );
                 break;
             }
 
@@ -3168,8 +3190,17 @@ class TelegramBot {
             }
 
             case 'start':
-            case 'help':
-                self::send($this->chatId, $this->txtHelp());
+            case 'help': {
+                $cat = $this->resolveHelpCategory($args[0] ?? 'overview');
+                self::send($this->chatId, $this->txtHelp($cat), ['reply_markup' => json_encode($this->kbHelp($cat, false))]);
+                break;
+            }
+            case 'features':
+            case 'fitur':
+                self::send($this->chatId, $this->txtFeatures(), ['reply_markup' => json_encode(['inline_keyboard' => [
+                    [['text' => $this->t('start.btn_help'), 'callback_data' => 'menu_help'],
+                     ['text' => $this->t('help.btn_close'), 'callback_data' => 'close_msg']],
+                ]])]);
                 break;
 
             case 'rules':
@@ -3622,11 +3653,13 @@ class TelegramBot {
                     $fullPrompt = $this->t('ai.reply_only', ['ctx' => $replyCtx]);
                 }
                 self::api('sendChatAction', ['chat_id' => $this->chatId, 'action' => 'typing']);
-                $history  = $this->db->getAiHistory($this->chatId, $this->userId);
-                $deepseek = new DeepSeek();
-                $aiReply  = $deepseek->chat($fullPrompt, $history);
-                $this->db->addAiMessage($this->chatId, $this->userId, 'user', $fullPrompt);
-                $this->db->addAiMessage($this->chatId, $this->userId, 'assistant', $aiReply);
+                $history   = $this->db->getAiHistory($this->chatId, $this->userId);
+                $chatModel = AiService::getActiveChatModel($this->db);
+                $aiReply   = AiService::chat($fullPrompt, $history, $chatModel);
+                if (strpos($aiReply, '❌') !== 0) {
+                    $this->db->addAiMessage($this->chatId, $this->userId, 'user', $fullPrompt);
+                    $this->db->addAiMessage($this->chatId, $this->userId, 'assistant', $aiReply);
+                }
                 sendAiReply($this->chatId, "🤖 " . $aiReply, ['reply_to_message_id' => $msgId]);
                 break;
             }
@@ -3655,11 +3688,11 @@ class TelegramBot {
                     break;
                 }
                 self::api('sendChatAction', ['chat_id' => $this->chatId, 'action' => 'typing']);
-                $prompt = "Translate the following text to {$targetLang}. Reply ONLY with the translated text, no explanation, no extra commentary:\n\n{$textToTranslate}";
-                $deepseek = new DeepSeek();
-                $result = $deepseek->chat($prompt, []);
+                $prompt    = "Translate the following text to {$targetLang}. Reply ONLY with the translated text, no explanation, no extra commentary:\n\n{$textToTranslate}";
+                $chatModel = AiService::getActiveChatModel($this->db);
+                $result    = AiService::chat($prompt, [], $chatModel);
                 if (strpos($result, '❌') === 0) {
-                    self::send($this->chatId, $this->t('translate.error'), ['reply_to_message_id' => $msgId]);
+                    self::send($this->chatId, $result, ['reply_to_message_id' => $msgId]);
                     break;
                 }
                 $reply = str_replace(['{lang}', '{result}'], [htmlspecialchars($targetLang), $result], $this->t('translate.result'));
@@ -3682,11 +3715,11 @@ class TelegramBot {
                     break;
                 }
                 self::api('sendChatAction', ['chat_id' => $this->chatId, 'action' => 'typing']);
-                $prompt = "Detect the language of the following text. Reply with: the language name (in both English and the local name), the language code (ISO 639-1), and a short confidence note. Format:\nLanguage: [name in English] / [local name]\nCode: [ISO code]\nConfidence: [high/medium/low]\n\nText:\n{$textToDetect}";
-                $deepseek = new DeepSeek();
-                $result = $deepseek->chat($prompt, []);
+                $prompt    = "Detect the language of the following text. Reply with: the language name (in both English and the local name), the language code (ISO 639-1), and a short confidence note. Format:\nLanguage: [name in English] / [local name]\nCode: [ISO code]\nConfidence: [high/medium/low]\n\nText:\n{$textToDetect}";
+                $chatModel = AiService::getActiveChatModel($this->db);
+                $result    = AiService::chat($prompt, [], $chatModel);
                 if (strpos($result, '❌') === 0) {
-                    self::send($this->chatId, $this->t('detect.error'), ['reply_to_message_id' => $msgId]);
+                    self::send($this->chatId, $result, ['reply_to_message_id' => $msgId]);
                     break;
                 }
                 $reply = str_replace('{result}', $result, $this->t('detect.result'));
@@ -3710,11 +3743,11 @@ class TelegramBot {
                     break;
                 }
                 self::api('sendChatAction', ['chat_id' => $this->chatId, 'action' => 'typing']);
-                $prompt = "Summarize the following text concisely. Use the same language as the source text. Present key points clearly using bullet points if appropriate. Reply ONLY with the summary, no preamble:\n\n{$textToSummarize}";
-                $deepseek = new DeepSeek();
-                $result = $deepseek->chat($prompt, []);
+                $prompt    = "Summarize the following text concisely. Use the same language as the source text. Present key points clearly using bullet points if appropriate. Reply ONLY with the summary, no preamble:\n\n{$textToSummarize}";
+                $chatModel = AiService::getActiveChatModel($this->db);
+                $result    = AiService::chat($prompt, [], $chatModel);
                 if (strpos($result, '❌') === 0) {
-                    self::send($this->chatId, $this->t('summarize.error'), ['reply_to_message_id' => $msgId]);
+                    self::send($this->chatId, $result, ['reply_to_message_id' => $msgId]);
                     break;
                 }
                 $reply = str_replace('{result}', $result, $this->t('summarize.result'));
@@ -4495,13 +4528,31 @@ class TelegramBot {
 
             case 'menu_help':
                 self::answerCb($cbId);
-                self::edit($this->chatId, $msgId, $this->txtHelp(), ['reply_markup' => json_encode(['inline_keyboard' => [[['text' => $this->t('kb.back'), 'callback_data' => 'menu_main']]]])]);
+                self::edit($this->chatId, $msgId, $this->txtHelp('overview'), ['reply_markup' => json_encode($this->kbHelp('overview', $this->chatId > 0))]);
                 break;
 
-            case 'menu_features':
+            case 'help_cat': {
+                $cat = $this->resolveHelpCategory($p1 ?: 'overview');
+                if ($cat === 'sa' && !$isSa) {
+                    self::answerCb($cbId, $this->t('help.sa_restricted'), true);
+                    break;
+                }
                 self::answerCb($cbId);
-                self::edit($this->chatId, $msgId, $this->txtFeatures(), ['reply_markup' => json_encode(['inline_keyboard' => [[['text' => $this->t('kb.back'), 'callback_data' => 'menu_main']]]])]);
+                self::edit($this->chatId, $msgId, $this->txtHelp($cat), ['reply_markup' => json_encode($this->kbHelp($cat, $this->chatId > 0))]);
                 break;
+            }
+
+            case 'menu_features': {
+                self::answerCb($cbId);
+                $isPm = $this->chatId > 0;
+                $navBtn = $isPm
+                    ? ['text' => $this->t('kb.back'), 'callback_data' => 'menu_main']
+                    : ['text' => $this->t('help.btn_close'), 'callback_data' => 'close_msg'];
+                self::edit($this->chatId, $msgId, $this->txtFeatures(), ['reply_markup' => json_encode(['inline_keyboard' => [
+                    [['text' => $this->t('start.btn_help'), 'callback_data' => 'menu_help'], $navBtn],
+                ]])]);
+                break;
+            }
 
             case 'menu_about':
                 self::answerCb($cbId);
@@ -5111,6 +5162,53 @@ class TelegramBot {
                 self::edit($this->chatId, $msgId, $this->txtSA(), ['reply_markup' => json_encode($this->kbSA())]);
                 break;
 
+            // ===== PENGATURAN AI DEFAULT (CHAT & IMAGE) =====
+            case 'sa_ai_settings':
+                if (!$isSa) { self::answerCb($cbId, $this->t('sa.access_denied_alert'), true); break; }
+                self::answerCb($cbId);
+                self::edit($this->chatId, $msgId, $this->txtSaAiSettings(), ['reply_markup' => json_encode($this->kbSaAiSettings())]);
+                break;
+
+            case 'sa_ai_chat_menu':
+                if (!$isSa) { self::answerCb($cbId, $this->t('sa.access_denied_alert'), true); break; }
+                self::answerCb($cbId);
+                self::edit($this->chatId, $msgId, $this->txtSaAiChatMenu(), ['reply_markup' => json_encode($this->kbSaAiChatMenu())]);
+                break;
+
+            case 'sa_ai_image_menu':
+                if (!$isSa) { self::answerCb($cbId, $this->t('sa.access_denied_alert'), true); break; }
+                self::answerCb($cbId);
+                self::edit($this->chatId, $msgId, $this->txtSaAiImageMenu(), ['reply_markup' => json_encode($this->kbSaAiImageMenu())]);
+                break;
+
+            case 'sa_set_ai_chat': {
+                if (!$isSa) { self::answerCb($cbId, $this->t('sa.access_denied_alert'), true); break; }
+                $modelId = trim((string)$p1);
+                if (!isset(AiConfig::CHAT_MODELS[$modelId])) {
+                    self::answerCb($cbId, '❌ Model tidak valid.', true);
+                    break;
+                }
+                $this->db->setDefaultAiChat($modelId);
+                $info = AiConfig::getChatModelInfo($modelId);
+                self::answerCb($cbId, $this->t('sa.ai_chat_updated', ['label' => $info['short']]));
+                self::edit($this->chatId, $msgId, $this->txtSaAiChatMenu(), ['reply_markup' => json_encode($this->kbSaAiChatMenu())]);
+                break;
+            }
+
+            case 'sa_set_ai_image': {
+                if (!$isSa) { self::answerCb($cbId, $this->t('sa.access_denied_alert'), true); break; }
+                $modelId = trim((string)$p1);
+                if (!isset(AiConfig::IMAGE_MODELS[$modelId])) {
+                    self::answerCb($cbId, '❌ Model tidak valid.', true);
+                    break;
+                }
+                $this->db->setDefaultAiImage($modelId);
+                $info = AiConfig::getImageModelInfo($modelId);
+                self::answerCb($cbId, $this->t('sa.ai_image_updated', ['label' => $info['short']]));
+                self::edit($this->chatId, $msgId, $this->txtSaAiImageMenu(), ['reply_markup' => json_encode($this->kbSaAiImageMenu())]);
+                break;
+            }
+
             // ===== SETTING GAMBAR AI =====
             case 'sa_img_settings':
                 if (!$isSa) { self::answerCb($cbId, $this->t('sa.access_denied_alert'), true); break; }
@@ -5120,6 +5218,7 @@ class TelegramBot {
                     $this->t('sa.img_settings_title', ['limit' => $curLimit === 0 ? '∞' : $curLimit]),
                     ['reply_markup' => json_encode(['inline_keyboard' => [
                         [['text' => '✏️ Ubah Limit', 'callback_data' => 'sa_img_limit_prompt']],
+                        [['text' => '🤖 Pengaturan AI', 'callback_data' => 'sa_ai_settings']],
                         [['text' => '🔙 Superadmin', 'callback_data' => 'sa_panel']],
                     ]])]);
                 break;
@@ -8697,18 +8796,71 @@ class TelegramBot {
         return $this->t('start.text', ['name' => $this->userFullName, 'sa' => '']);
     }
 
-    private function txtHelp(): string {
-        return $this->t('help.title')
-            . $this->t('help.general')
-            . $this->t('help.admin')
-            . $this->t('help.lock')
-            . $this->t('help.note')
-            . $this->t('help.filter')
-            . $this->t('help.violation')
-            . $this->t('help.sang_mata')
-            . $this->t('help.votekick')
-            . $this->t('help.ai')
-            . $this->t('help.settings');
+    private function resolveHelpCategory(string $raw): string {
+        $k = strtolower(trim($raw));
+        return match ($k) {
+            'general', 'umum', 'info'                                      => 'general',
+            'admin', 'mod', 'moderation', 'moderasi'                       => 'admin',
+            'content', 'konten', 'lock', 'locks', 'note', 'notes', 'filter', 'filters' => 'content',
+            'safety', 'sanksi', 'violation', 'sangmata', 'sang_mata', 'votekick' => 'safety',
+            'ai', 'tools', 'tool', 'utilitas', 'run', 'price', 'crypto'    => 'ai',
+            'settings', 'setting', 'pengaturan', 'grup', 'group'           => 'settings',
+            'sa', 'superadmin', 'hosting', 'cpanel', 'whm', 'email', 'tempmail' => 'sa',
+            default                                                        => 'overview',
+        };
+    }
+
+    private function txtHelp(string $cat = 'overview'): string {
+        $cat = $this->resolveHelpCategory($cat);
+        return match ($cat) {
+            'general'  => $this->t('help.title') . $this->t('help.general'),
+            'admin'    => $this->t('help.title') . $this->t('help.admin'),
+            'content'  => $this->t('help.title') . $this->t('help.lock') . $this->t('help.note') . $this->t('help.filter'),
+            'safety'   => $this->t('help.title') . $this->t('help.violation') . $this->t('help.sang_mata') . $this->t('help.votekick'),
+            'ai'       => $this->t('help.title') . $this->t('help.ai') . $this->t('help.tools'),
+            'settings' => $this->t('help.title') . $this->t('help.settings'),
+            'sa'       => self::isSA($this->userId)
+                            ? $this->t('help.title') . $this->t('help.sa')
+                            : $this->t('help.sa_restricted'),
+            default    => $this->t('help.title')
+                            . $this->t('help.overview')
+                            . (self::isSA($this->userId) ? $this->t('help.overview_sa') : ''),
+        };
+    }
+
+    private function kbHelp(string $activeCat = 'overview', bool $isPrivate = true): array {
+        $mark = fn(string $cat, string $labelKey): string =>
+            ($activeCat === $cat ? '✅ ' : '') . $this->t($labelKey);
+
+        $rows = [
+            [
+                ['text' => $mark('general', 'help.btn_general'),   'callback_data' => 'help_cat:general'],
+                ['text' => $mark('admin',   'help.btn_admin'),     'callback_data' => 'help_cat:admin'],
+            ],
+            [
+                ['text' => $mark('content', 'help.btn_content'),   'callback_data' => 'help_cat:content'],
+                ['text' => $mark('safety',  'help.btn_safety'),    'callback_data' => 'help_cat:safety'],
+            ],
+            [
+                ['text' => $mark('ai',       'help.btn_ai'),       'callback_data' => 'help_cat:ai'],
+                ['text' => $mark('settings', 'help.btn_settings'), 'callback_data' => 'help_cat:settings'],
+            ],
+        ];
+        if (self::isSA($this->userId)) {
+            $rows[] = [
+                ['text' => $mark('sa', 'help.btn_sa'), 'callback_data' => 'help_cat:sa'],
+            ];
+        }
+        $lastRow = [];
+        if ($activeCat !== 'overview') {
+            $lastRow[] = ['text' => $this->t('help.btn_overview'), 'callback_data' => 'help_cat:overview'];
+        }
+        $lastRow[] = ['text' => $this->t('help.btn_features'), 'callback_data' => 'menu_features'];
+        $lastRow[] = $isPrivate
+            ? ['text' => $this->t('kb.back'), 'callback_data' => 'menu_main']
+            : ['text' => $this->t('help.btn_close'), 'callback_data' => 'close_msg'];
+        $rows[] = $lastRow;
+        return ['inline_keyboard' => $rows];
     }
 
     private function txtFeatures(): string {
@@ -9039,7 +9191,7 @@ class TelegramBot {
             . "⚠️ Warn: <b>{$s['warn_limit']}</b> → <b>{$s['warn_action']}</b>\n"
             . $on($s['violation_enabled'])   . " " . $this->t('settings.violation_label') . ": <b>{$s['violation_limit']}</b> → <b>{$s['violation_action']}</b>\n"
             . $on($s['votekick_enabled'])    . " VoteKick: <b>" . ($s['votekick_threshold'] ?? 5) . "</b>v/<b>" . ($s['votekick_duration'] ?? 5) . "</b>m\n"
-            . $on($s['ai_enabled'])            . " AI (DeepSeek)\n"
+            . $on($s['ai_enabled'])            . " AI (" . htmlspecialchars(AiConfig::getChatModelInfo(AiService::getActiveChatModel($this->db))['short']) . ")\n"
             . $on($s['rules_btn_enabled'] ?? 0) . " Rules Btn\n"
             . $on($s['sang_mata_enabled'] ?? 0) . " " . $this->t('sang_mata.label') . "\n"
             . "🌐 " . $this->t('settings.log_channel', ['channel' => $lch]) . "\n"
@@ -9193,10 +9345,80 @@ class TelegramBot {
         $maint    = $this->db->getBotSetting('maintenance_mode', '0');
         $maintBtn = $maint === '1' ? $this->t('sa.kb_maint_on') : $this->t('sa.kb_maint_off');
         return ['inline_keyboard' => [
+            [['text' => $this->t('sa.kb_ai_settings'),  'callback_data' => 'sa_ai_settings']],
             [['text' => $this->t('sa.kb_img_settings'), 'callback_data' => 'sa_img_settings']],
             [['text' => $maintBtn,                       'callback_data' => 'sa_maintenance']],
             [['text' => $this->t('sa.cat_back_btn'),    'callback_data' => 'sa_panel']],
         ]];
+    }
+
+    private function txtSaAiSettings(): string {
+        $chatId   = AiService::getActiveChatModel($this->db);
+        $imgId    = AiService::getActiveImageModel($this->db);
+        $chatInfo = AiConfig::getChatModelInfo($chatId);
+        $imgInfo  = AiConfig::getImageModelInfo($imgId);
+
+        return $this->t('sa.ai_settings_title', [
+            'chat_label'      => htmlspecialchars($chatInfo['label']),
+            'chat_id'         => htmlspecialchars($chatId),
+            'image_label'     => htmlspecialchars($imgInfo['label']),
+            'image_id'        => htmlspecialchars($imgId),
+            'gemini_status'   => AiConfig::isGeminiKeyConfigured() ? $this->t('sa.ai_key_ok') : $this->t('sa.ai_key_missing'),
+            'deepseek_status' => AiConfig::isDeepSeekKeyConfigured() ? $this->t('sa.ai_key_ok') : $this->t('sa.ai_key_missing'),
+        ]);
+    }
+
+    private function kbSaAiSettings(): array {
+        return ['inline_keyboard' => [
+            [['text' => $this->t('sa.ai_kb_chat'),       'callback_data' => 'sa_ai_chat_menu']],
+            [['text' => $this->t('sa.ai_kb_image'),      'callback_data' => 'sa_ai_image_menu']],
+            [['text' => $this->t('sa.kb_img_settings'),  'callback_data' => 'sa_img_settings']],
+            [['text' => $this->t('sa.cat_back_btn'),     'callback_data' => 'sa_cat_settings']],
+        ]];
+    }
+
+    private function txtSaAiChatMenu(): string {
+        $activeId = AiService::getActiveChatModel($this->db);
+        $info     = AiConfig::getChatModelInfo($activeId);
+        $txt      = $this->t('sa.ai_chat_menu_title', ['current' => htmlspecialchars($info['label'])]) . "\n\n";
+        foreach (AiConfig::CHAT_MODELS as $id => $m) {
+            $mark = ($id === $activeId) ? '✅ ' : '▫️ ';
+            $txt .= "{$mark}<b>" . htmlspecialchars($m['label']) . "</b> (<code>{$id}</code>)\n   <i>" . htmlspecialchars($m['desc']) . "</i>\n";
+        }
+        return $txt;
+    }
+
+    private function kbSaAiChatMenu(): array {
+        $activeId = AiService::getActiveChatModel($this->db);
+        $rows     = [];
+        foreach (AiConfig::CHAT_MODELS as $id => $m) {
+            $prefix = ($id === $activeId) ? '✅ ' : '';
+            $rows[] = [['text' => $prefix . $m['label'], 'callback_data' => "sa_set_ai_chat:$id"]];
+        }
+        $rows[] = [['text' => $this->t('sa.cat_back_btn'), 'callback_data' => 'sa_ai_settings']];
+        return ['inline_keyboard' => $rows];
+    }
+
+    private function txtSaAiImageMenu(): string {
+        $activeId = AiService::getActiveImageModel($this->db);
+        $info     = AiConfig::getImageModelInfo($activeId);
+        $txt      = $this->t('sa.ai_image_menu_title', ['current' => htmlspecialchars($info['label'])]) . "\n\n";
+        foreach (AiConfig::IMAGE_MODELS as $id => $m) {
+            $mark = ($id === $activeId) ? '✅ ' : '▫️ ';
+            $txt .= "{$mark}<b>" . htmlspecialchars($m['label']) . "</b> (<code>{$id}</code>)\n   <i>" . htmlspecialchars($m['desc']) . "</i>\n";
+        }
+        return $txt;
+    }
+
+    private function kbSaAiImageMenu(): array {
+        $activeId = AiService::getActiveImageModel($this->db);
+        $rows     = [];
+        foreach (AiConfig::IMAGE_MODELS as $id => $m) {
+            $prefix = ($id === $activeId) ? '✅ ' : '';
+            $rows[] = [['text' => $prefix . $m['label'], 'callback_data' => "sa_set_ai_image:$id"]];
+        }
+        $rows[] = [['text' => $this->t('sa.cat_back_btn'), 'callback_data' => 'sa_ai_settings']];
+        return ['inline_keyboard' => $rows];
     }
 
     private function kbSACatServices(): array {
@@ -9478,10 +9700,15 @@ class TelegramBot {
     }
 
     private function txtAiSettings(array $s): string {
-        $on = fn($v) => $v ? $this->t('settings.status_active') : $this->t('settings.status_inactive');
-        return $this->t('settings.ai_title') . "\n\n"
+        $on        = fn($v) => $v ? $this->t('settings.status_active') : $this->t('settings.status_inactive');
+        $chatInfo  = AiConfig::getChatModelInfo(AiService::getActiveChatModel($this->db));
+        $imageInfo = AiConfig::getImageModelInfo(AiService::getActiveImageModel($this->db));
+        return $this->t('settings.ai_title', ['provider' => htmlspecialchars($chatInfo['short'])]) . "\n\n"
             . $this->t('settings.welcome_status', ['status' => $on($s['ai_enabled'])]) . "\n\n"
-            . $this->t('settings.ai_howto');
+            . $this->t('settings.ai_howto', [
+                'chat_model'  => htmlspecialchars($chatInfo['label']),
+                'image_model' => htmlspecialchars($imageInfo['label']),
+            ]);
     }
 
     private function kbAiSettings(array $s, int $cid): array {

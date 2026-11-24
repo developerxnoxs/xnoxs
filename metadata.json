@@ -1,0 +1,6 @@
+{
+  "name": "xnoxsguard_bot — Telegram Group Management Bot",
+  "description": "Telegram group & channel management bot with auto-moderation, captcha verification, notes/filters, AI chat, code runner, and webhook setup panel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

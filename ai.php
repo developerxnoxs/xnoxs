@@ -1,8 +1,9 @@
 <?php
 /**
  * ================================================================
- *  DeepSeek AI Client
- *  Digunakan oleh webhook.php untuk fitur /ai
+ *  AI Client (Gemini API + DeepSeek API)
+ *  Digunakan oleh webhook.php untuk /ai, /translate, /detect,
+ *  /summarize, /imagine, /edit, serta pemilihan default di panel SA.
  * ================================================================
  */
 
@@ -11,14 +12,6 @@
  *
  * Telegram HTML mendukung: <b>, <i>, <u>, <s>, <code>, <pre>, <a>
  * Pre + code mendukung: <pre><code class="language-xxx">...</code></pre>
- *
- * Urutan pemrosesan penting untuk menghindari konflik regex:
- * 1. Ekstrak code blocks (```...```) → placeholder
- * 2. Ekstrak inline code (`...`) → placeholder
- * 3. Escape HTML di teks biasa
- * 4. Konversi list dulu (sebelum italic) agar `*` di awal baris tidak terpicu italic
- * 5. Bold, italic, strikethrough, heading
- * 6. Restore placeholder
  */
 function markdownToTelegramHtml(string $text): string {
     $placeholders = [];
@@ -32,7 +25,6 @@ function markdownToTelegramHtml(string $text): string {
             $code = htmlspecialchars(trim($m[2]), ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8');
             $key  = "\x02BLOCK{$idx}\x03";
 
-            // Bahasa yang didukung Telegram untuk syntax highlight
             $supported = [
                 'php','python','javascript','js','typescript','ts',
                 'java','kotlin','swift','c','cpp','c++','go','rust',
@@ -72,15 +64,13 @@ function markdownToTelegramHtml(string $text): string {
     }
 
     // ── 4. Unordered list: `* item` atau `- item` di awal baris ───────────
-    //   (harus sebelum italic agar `*` tidak tertangkap sebagai italic)
     $text = preg_replace('/^[ \t]*[-*]\s+(.+)$/m', '• $1', $text);
 
     // ── 5. Bold: **text** atau __text__ ────────────────────────────────────
     $text = preg_replace('/\*\*(.+?)\*\*/s', '<b>$1</b>', $text);
     $text = preg_replace('/__(.+?)__/s',     '<b>$1</b>', $text);
 
-    // ── 6. Italic: *text* (bukan ** atau list) atau _text_ ─────────────────
-    //   Pastikan tidak menangkap tanda `*` yang tersisa dari **bold** atau list
+    // ── 6. Italic: *text* atau _text_ ──────────────────────────────────────
     $text = preg_replace('/(?<!\*)\*(?!\*)(?!\s)(.+?)(?<!\s)\*(?!\*)/s', '<i>$1</i>', $text);
     $text = preg_replace('/(?<![_\w])_(?!_)(.+?)(?<!_)_(?![_\w])/s',    '<i>$1</i>', $text);
 
@@ -90,7 +80,7 @@ function markdownToTelegramHtml(string $text): string {
     // ── 8. Heading: # Judul  →  <b>Judul</b> ──────────────────────────────
     $text = preg_replace('/^#{1,6}\s+(.+)$/m', '<b>$1</b>', $text);
 
-    // ── 9. Blockquote: > teks  →  diremove tanda > saja ──────────────────
+    // ── 9. Blockquote: > teks ──────────────────────────────────────────────
     $text = preg_replace('/^>\s?/m', '', $text);
 
     // ── 10. Restore placeholder ────────────────────────────────────────────
@@ -102,7 +92,6 @@ function markdownToTelegramHtml(string $text): string {
 
 /**
  * Pecah teks panjang menjadi potongan aman untuk Telegram (maks $limit karakter).
- * Pemotongan di titik alami: setelah </pre>, setelah \n\n, atau setelah \n.
  */
 function splitHtmlChunks(string $text, int $limit = 4000): array {
     if (mb_strlen($text) <= $limit) {
@@ -119,9 +108,8 @@ function splitHtmlChunks(string $text, int $limit = 4000): array {
 
         $slice = mb_substr($text, 0, $limit);
 
-        // ── Deteksi apakah kita di dalam blok <pre><code> ──────────────────
-        $opens  = substr_count($slice, '<pre>');
-        $closes = substr_count($slice, '</pre>');
+        $opens     = substr_count($slice, '<pre>');
+        $closes    = substr_count($slice, '</pre>');
         $insidePre = ($opens > $closes);
 
         $pos             = false;
@@ -129,33 +117,25 @@ function splitHtmlChunks(string $text, int $limit = 4000): array {
         $reopenTag       = '<pre><code>';
 
         if ($insidePre) {
-            // Cari tag pembuka <pre><code...> terakhir yang belum ditutup,
-            // agar bisa dibuka kembali di chunk berikutnya.
             if (preg_match_all('/<pre>(<code[^>]*>)/', $slice, $m)) {
                 $lastCodeTag = end($m[1]);
                 $reopenTag   = '<pre>' . $lastCodeTag;
             }
 
-            // Potong di baris terakhir sebelum limit (supaya tidak putus di tengah baris kode)
             $p = mb_strrpos($slice, "\n");
             if ($p !== false && $p > 0) {
                 $pos             = $p + 1;
                 $needCloseReopen = true;
             } else {
-                // Tidak ada newline, paksa potong di limit
                 $pos             = $limit;
                 $needCloseReopen = true;
             }
         } else {
-            // ── Bukan di dalam pre block: cari titik potong alami ──────────
-
-            // 1. Setelah </pre>
             $p = mb_strrpos($slice, '</pre>');
             if ($p !== false) {
                 $pos = $p + mb_strlen('</pre>');
             }
 
-            // 2. Setelah \n\n (paragraph break)
             if ($pos === false || $pos < (int)($limit * 0.4)) {
                 $p2 = mb_strrpos($slice, "\n\n");
                 if ($p2 !== false && $p2 > (int)($limit * 0.3)) {
@@ -163,7 +143,6 @@ function splitHtmlChunks(string $text, int $limit = 4000): array {
                 }
             }
 
-            // 3. Setelah \n (line break)
             if ($pos === false || $pos < (int)($limit * 0.3)) {
                 $p3 = mb_strrpos($slice, "\n");
                 if ($p3 !== false && $p3 > (int)($limit * 0.2)) {
@@ -171,7 +150,6 @@ function splitHtmlChunks(string $text, int $limit = 4000): array {
                 }
             }
 
-            // 4. Paksa potong di limit
             if ($pos === false || $pos === 0) {
                 $pos = $limit;
             }
@@ -180,10 +158,8 @@ function splitHtmlChunks(string $text, int $limit = 4000): array {
         $chunk = trim(mb_substr($text, 0, $pos));
 
         if ($needCloseReopen) {
-            // Tutup code block di akhir chunk ini
             $chunk .= "\n</code></pre>";
-            // Buka kembali code block di awal sisa teks
-            $text = $reopenTag . "\n" . ltrim(mb_substr($text, $pos));
+            $text   = $reopenTag . "\n" . ltrim(mb_substr($text, $pos));
         } else {
             $text = mb_substr($text, $pos);
         }
@@ -226,15 +202,12 @@ function sendOneChunk(int $chatId, string $htmlChunk, array $extra = []): array 
 
 /**
  * Kirim pesan AI ke Telegram.
- * - Otomatis memecah pesan panjang (> 4000 karakter) jadi beberapa pesan
- * - Fallback ke plain text jika HTML ditolak Telegram
  */
 function sendAiReply(int $chatId, string $htmlText, array $extra = []): array {
     $chunks = splitHtmlChunks($htmlText, 4000);
     $result = ['ok' => true];
 
     foreach ($chunks as $i => $chunk) {
-        // reply_to_message_id hanya untuk pesan pertama
         $chunkExtra = ($i === 0) ? $extra : array_diff_key($extra, ['reply_to_message_id' => 0]);
         $result     = sendOneChunk($chatId, $chunk, $chunkExtra);
     }
@@ -244,7 +217,6 @@ function sendAiReply(int $chatId, string $htmlText, array $extra = []): array {
 
 /**
  * Helper untuk memanggil Telegram API (digunakan oleh sendAiReply).
- * Pada runtime normal, webhook.php sudah define API_URL, jadi kita gunakan itu.
  */
 function _telegramApi(string $method, array $params): array {
     if (!defined('API_URL')) {
@@ -265,304 +237,532 @@ function _telegramApi(string $method, array $params): array {
 }
 
 // ============================================================
-//  UUID v7 Generator (time-ordered, required by ai-seek API)
+//  UUID v7 Generator
 // ============================================================
 function generateUuidV7(): string {
-    // 48-bit Unix timestamp in milliseconds
     $ms    = (int)(microtime(true) * 1000);
     $tsHex = str_pad(dechex($ms), 12, '0', STR_PAD_LEFT);
 
-    // 12-bit random for seq field
     $randA    = random_int(0, 0x0fff);
     $randAHex = str_pad(dechex($randA), 3, '0', STR_PAD_LEFT);
 
-    // 64-bit random for the last two groups, with variant bits set (10xx xxxx)
     $randB    = random_bytes(8);
     $randB[0] = chr((ord($randB[0]) & 0x3f) | 0x80);
     $randBHex = bin2hex($randB);
 
-    $p1 = substr($tsHex, 0, 8);   // 32 bits timestamp
-    $p2 = substr($tsHex, 8, 4);   // 16 bits timestamp
-    $p3 = '7' . $randAHex;        // version 7 + 12 bits random
-    $p4 = substr($randBHex, 0, 4); // 16 bits (variant set)
-    $p5 = substr($randBHex, 4, 12); // 48 bits random
+    $p1 = substr($tsHex, 0, 8);
+    $p2 = substr($tsHex, 8, 4);
+    $p3 = '7' . $randAHex;
+    $p4 = substr($randBHex, 0, 4);
+    $p5 = substr($randBHex, 4, 12);
 
     return "{$p1}-{$p2}-{$p3}-{$p4}-{$p5}";
 }
 
 // ============================================================
-//  AI Image Generation Client (ai-seek.thebetter.ai)
+//  AI Model Registry & Configuration
+// ============================================================
+class AiConfig {
+    public const DEFAULT_CHAT_MODEL  = 'gemini-4-hydrogen';
+    public const DEFAULT_IMAGE_MODEL = 'gemini-3.1-flash-lite-image';
+
+    public const CHAT_MODELS = [
+        'gemini-4-hydrogen' => [
+            'label'    => '✨ Gemini 4 Hydrogen',
+            'short'    => 'Gemini 4 Hydrogen',
+            'provider' => 'gemini',
+            'desc'     => 'Standar & seimbang (Rekomendasi)',
+        ],
+        'gemini-3.1-flash-lite' => [
+            'label'    => '⚡ Gemini 3.1 Flash Lite',
+            'short'    => 'Gemini Flash Lite',
+            'provider' => 'gemini',
+            'desc'     => 'Respons sangat cepat & ringan',
+        ],
+        'gemini-4-neon' => [
+            'label'    => '🧠 Gemini 4 Neon',
+            'short'    => 'Gemini 4 Neon',
+            'provider' => 'gemini',
+            'desc'     => 'Penalaran kompleks (Paid API Key)',
+        ],
+        'gemini-4-carbon' => [
+            'label'    => '🔬 Gemini 4 Carbon',
+            'short'    => 'Gemini 4 Carbon',
+            'provider' => 'gemini',
+            'desc'     => 'Penalaran mendalam (Paid API Key)',
+        ],
+        'deepseek-chat' => [
+            'label'    => '🐋 DeepSeek Chat',
+            'short'    => 'DeepSeek',
+            'provider' => 'deepseek',
+            'desc'     => 'Official DeepSeek API (DEEPSEEK_API_KEY)',
+        ],
+    ];
+
+    public const IMAGE_MODELS = [
+        'gemini-3.1-flash-lite-image' => [
+            'label'    => '🍌 Gemini 3.1 Flash Lite Image',
+            'short'    => 'Gemini Flash Image',
+            'provider' => 'gemini',
+            'desc'     => 'Cepat & serbaguna (Default)',
+        ],
+        'gemini-nano-banana-2.1' => [
+            'label'    => '🖼️ Gemini Nano Banana 2.1',
+            'short'    => 'Nano Banana 2.1',
+            'provider' => 'gemini',
+            'desc'     => 'Kualitas tinggi (1K/2K/4K)',
+        ],
+        'gemini-3-pro-image' => [
+            'label'    => '🎨 Gemini 3 Pro Image',
+            'short'    => 'Gemini 3 Pro Image',
+            'provider' => 'gemini',
+            'desc'     => 'Detail artistik Pro',
+        ],
+    ];
+
+    public static function resolveChatModel(?string $modelId): string {
+        $id = trim((string)$modelId);
+        return isset(self::CHAT_MODELS[$id]) ? $id : self::DEFAULT_CHAT_MODEL;
+    }
+
+    public static function resolveImageModel(?string $modelId): string {
+        $id = trim((string)$modelId);
+        return isset(self::IMAGE_MODELS[$id]) ? $id : self::DEFAULT_IMAGE_MODEL;
+    }
+
+    public static function getChatModelInfo(?string $modelId): array {
+        $resolved = self::resolveChatModel($modelId);
+        return self::CHAT_MODELS[$resolved] + ['id' => $resolved];
+    }
+
+    public static function getImageModelInfo(?string $modelId): array {
+        $resolved = self::resolveImageModel($modelId);
+        return self::IMAGE_MODELS[$resolved] + ['id' => $resolved];
+    }
+
+    public static function getGeminiApiKey(): string {
+        if (defined('GEMINI_API_KEY') && GEMINI_API_KEY !== '') {
+            return (string)GEMINI_API_KEY;
+        }
+        return (string)(getenv('GEMINI_API_KEY') ?: ($_ENV['GEMINI_API_KEY'] ?? ''));
+    }
+
+    public static function getDeepSeekApiKey(): string {
+        if (defined('DEEPSEEK_API_KEY') && DEEPSEEK_API_KEY !== '') {
+            return (string)DEEPSEEK_API_KEY;
+        }
+        return (string)(getenv('DEEPSEEK_API_KEY') ?: ($_ENV['DEEPSEEK_API_KEY'] ?? ''));
+    }
+
+    public static function isGeminiKeyConfigured(): bool {
+        return self::getGeminiApiKey() !== '';
+    }
+
+    public static function isDeepSeekKeyConfigured(): bool {
+        return self::getDeepSeekApiKey() !== '';
+    }
+}
+
+// ============================================================
+//  Gemini AI Client (REST v1beta via Pure PHP cURL)
+// ============================================================
+class GeminiClient {
+    private string $apiKey;
+    private string $baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/';
+
+    public function __construct(?string $apiKey = null) {
+        $this->apiKey = $apiKey !== null ? $apiKey : AiConfig::getGeminiApiKey();
+    }
+
+    /**
+     * Panggil endpoint generateContent dengan retry exponential backoff untuk error transient.
+     */
+    private function request(string $model, array $payload, int $timeout = 90): array {
+        if ($this->apiKey === '') {
+            return [
+                'ok'       => false,
+                'httpCode' => 0,
+                'error'    => 'GEMINI_API_KEY belum diset di environment server.',
+            ];
+        }
+
+        $url  = $this->baseUrl . rawurlencode($model) . ':generateContent';
+        $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        $maxAttempts = 3;
+        $delaySec    = 1;
+
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => $json,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT        => $timeout,
+                CURLOPT_HTTPHEADER     => [
+                    'Content-Type: application/json',
+                    'x-goog-api-key: ' . $this->apiKey,
+                    'User-Agent: aistudio-build',
+                ],
+            ]);
+            $response = curl_exec($ch);
+            $errno    = curl_errno($ch);
+            $curlErr  = curl_error($ch);
+            $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($errno) {
+                if ($attempt < $maxAttempts) {
+                    sleep($delaySec);
+                    $delaySec *= 2;
+                    continue;
+                }
+                return [
+                    'ok'       => false,
+                    'httpCode' => 0,
+                    'error'    => 'Gagal menghubungi Gemini API: ' . $curlErr,
+                ];
+            }
+
+            $data = json_decode($response ?: '{}', true);
+            if (!is_array($data)) {
+                return [
+                    'ok'       => false,
+                    'httpCode' => $httpCode,
+                    'error'    => "Respons tidak valid dari Gemini API (HTTP {$httpCode}).",
+                ];
+            }
+
+            if ($httpCode >= 200 && $httpCode < 300 && !isset($data['error'])) {
+                return ['ok' => true, 'httpCode' => $httpCode, 'data' => $data];
+            }
+
+            // Retry hanya pada rate limit / service unavailable sementara
+            if (($httpCode === 429 || $httpCode === 503) && $attempt < $maxAttempts) {
+                sleep($delaySec);
+                $delaySec *= 2;
+                continue;
+            }
+
+            $errMsg = $data['error']['message'] ?? "HTTP {$httpCode}";
+            $status = $data['error']['status'] ?? '';
+
+            if ($httpCode === 403 || $status === 'PERMISSION_DENIED') {
+                $errMsg = 'API key Gemini tidak memiliki izin atau tidak valid (403 PERMISSION_DENIED).';
+            } elseif ($httpCode === 404 || $status === 'NOT_FOUND') {
+                $errMsg = "Model '{$model}' tidak ditemukan atau belum didukung (404 NOT_FOUND).";
+            } elseif ($httpCode === 429 || $status === 'RESOURCE_EXHAUSTED') {
+                $errMsg = 'Kuota / rate limit Gemini API tercapai (429 RESOURCE_EXHAUSTED). Pastikan menggunakan API key dengan kuota atau billing aktif.';
+            }
+
+            return [
+                'ok'       => false,
+                'httpCode' => $httpCode,
+                'error'    => $errMsg,
+            ];
+        }
+
+        return ['ok' => false, 'httpCode' => 0, 'error' => 'Gagal memanggil Gemini API.'];
+    }
+
+    /**
+     * Chat multi-turn dengan Gemini.
+     */
+    public function chat(
+        string $userPrompt,
+        array $history = [],
+        string $model = AiConfig::DEFAULT_CHAT_MODEL,
+        string $systemInstruction = ''
+    ): string {
+        $model = AiConfig::resolveChatModel($model);
+        if (AiConfig::CHAT_MODELS[$model]['provider'] !== 'gemini') {
+            $model = AiConfig::DEFAULT_CHAT_MODEL;
+        }
+
+        $contents = [];
+        foreach ($history as $item) {
+            $text = trim((string)($item['content'] ?? ''));
+            if ($text === '' || strpos($text, '❌') === 0) {
+                continue;
+            }
+            $role = (($item['role'] ?? 'user') === 'assistant') ? 'model' : 'user';
+            if ($role === 'model' && strpos($text, '🤖 ') === 0) {
+                $text = substr($text, strlen('🤖 '));
+            }
+            $contents[] = [
+                'role'  => $role,
+                'parts' => [['text' => $text]],
+            ];
+        }
+
+        $contents[] = [
+            'role'  => 'user',
+            'parts' => [['text' => $userPrompt]],
+        ];
+
+        $payload = ['contents' => $contents];
+        if (trim($systemInstruction) !== '') {
+            $payload['systemInstruction'] = [
+                'parts' => [['text' => trim($systemInstruction)]],
+            ];
+        }
+
+        $res = $this->request($model, $payload, 90);
+        if (!$res['ok']) {
+            return '❌ ' . $res['error'];
+        }
+
+        $parts = $res['data']['candidates'][0]['content']['parts'] ?? [];
+        $out   = '';
+        foreach ($parts as $part) {
+            if (!empty($part['thought'])) {
+                continue;
+            }
+            if (isset($part['text'])) {
+                $out .= $part['text'];
+            }
+        }
+
+        if (trim($out) === '') {
+            $finishReason = $res['data']['candidates'][0]['finishReason'] ?? '';
+            if ($finishReason === 'SAFETY') {
+                return '❌ Permintaan diblokir oleh filter keamanan AI.';
+            }
+            return '❌ AI tidak mengembalikan jawaban teks.';
+        }
+
+        return markdownToTelegramHtml($out);
+    }
+
+    /**
+     * Generate gambar baru dari teks prompt menggunakan Gemini Image Models.
+     * Return: ['ok' => true, 'data' => binary, 'mime' => string] atau ['ok' => false, 'error' => string]
+     */
+    public function generateImage(string $prompt, string $model = AiConfig::DEFAULT_IMAGE_MODEL): array {
+        $model   = AiConfig::resolveImageModel($model);
+        $payload = [
+            'contents' => [[
+                'role'  => 'user',
+                'parts' => [['text' => $prompt]],
+            ]],
+        ];
+
+        if ($model === 'gemini-nano-banana-2.1' || $model === 'gemini-3-pro-image') {
+            $payload['generationConfig'] = [
+                'imageConfig' => [
+                    'aspectRatio' => '1:1',
+                    'imageSize'   => '1K',
+                ],
+            ];
+        }
+
+        $res = $this->request($model, $payload, 120);
+        if (!$res['ok']) {
+            return ['ok' => false, 'error' => '❌ ' . $res['error']];
+        }
+
+        return $this->extractImageFromResponse($res['data'], '❌ Tidak ada gambar yang dihasilkan. Coba prompt yang lebih spesifik.');
+    }
+
+    /**
+     * Edit gambar dari binary gambar + instruksi teks.
+     * Return: ['ok' => true, 'data' => binary, 'mime' => string] atau ['ok' => false, 'error' => string]
+     */
+    public function editImage(
+        string $imageBinary,
+        string $instruction,
+        string $model = AiConfig::DEFAULT_IMAGE_MODEL,
+        string $mimeType = ''
+    ): array {
+        $model = AiConfig::resolveImageModel($model);
+        if ($mimeType === '') {
+            $mimeType = self::detectImageMime($imageBinary);
+        }
+
+        $payload = [
+            'contents' => [[
+                'role'  => 'user',
+                'parts' => [
+                    [
+                        'inlineData' => [
+                            'mimeType' => $mimeType,
+                            'data'     => base64_encode($imageBinary),
+                        ],
+                    ],
+                    [
+                        'text' => $instruction,
+                    ],
+                ],
+            ]],
+        ];
+
+        $res = $this->request($model, $payload, 120);
+        if (!$res['ok']) {
+            return ['ok' => false, 'error' => '❌ ' . $res['error']];
+        }
+
+        return $this->extractImageFromResponse($res['data'], '❌ AI tidak menghasilkan gambar hasil edit. Coba instruksi yang lebih jelas.');
+    }
+
+    private function extractImageFromResponse(array $data, string $emptyErr): array {
+        $parts = $data['candidates'][0]['content']['parts'] ?? [];
+        $textFallback = '';
+        foreach ($parts as $part) {
+            if (!empty($part['inlineData']['data'])) {
+                $raw = base64_decode($part['inlineData']['data'], true);
+                if ($raw !== false && $raw !== '') {
+                    return [
+                        'ok'   => true,
+                        'data' => $raw,
+                        'mime' => $part['inlineData']['mimeType'] ?? 'image/png',
+                    ];
+                }
+            } elseif (!empty($part['text']) && empty($part['thought'])) {
+                $textFallback .= ' ' . trim($part['text']);
+            }
+        }
+
+        $finishReason = $data['candidates'][0]['finishReason'] ?? '';
+        if ($finishReason === 'SAFETY') {
+            return ['ok' => false, 'error' => '❌ Permintaan gambar diblokir oleh filter keamanan AI.'];
+        }
+        if (trim($textFallback) !== '') {
+            return ['ok' => false, 'error' => '❌ ' . mb_substr(trim($textFallback), 0, 300)];
+        }
+        return ['ok' => false, 'error' => $emptyErr];
+    }
+
+    public static function detectImageMime(string $binary): string {
+        if (function_exists('finfo_open')) {
+            $finfo = @finfo_open(FILEINFO_MIME_TYPE);
+            if ($finfo) {
+                $mime = @finfo_buffer($finfo, $binary);
+                @finfo_close($finfo);
+                if (is_string($mime) && strpos($mime, 'image/') === 0) {
+                    return $mime;
+                }
+            }
+        }
+        if (function_exists('getimagesizefromstring')) {
+            $info = @getimagesizefromstring($binary);
+            if (!empty($info['mime'])) {
+                return $info['mime'];
+            }
+        }
+        return 'image/jpeg';
+    }
+}
+
+// ============================================================
+//  DeepSeek Official API Client
+// ============================================================
+class DeepSeek {
+    private string $apiKey;
+    private string $apiUrl;
+
+    public function __construct(?string $apiKey = null, ?string $apiUrl = null) {
+        $this->apiKey = $apiKey !== null ? $apiKey : AiConfig::getDeepSeekApiKey();
+        $this->apiUrl = $apiUrl !== null
+            ? $apiUrl
+            : (defined('DEEPSEEK_API_URL') ? DEEPSEEK_API_URL : 'https://api.deepseek.com/v1/chat/completions');
+    }
+
+    /**
+     * Kirim pesan ke DeepSeek Official API (atau delegate ke AiService jika model bukan deepseek).
+     */
+    public function chat(string $userPrompt, array $history = [], string $model = 'deepseek-chat', string $systemInstruction = ''): string {
+        // Jika model adalah Gemini, teruskan ke GeminiClient
+        if (isset(AiConfig::CHAT_MODELS[$model]) && AiConfig::CHAT_MODELS[$model]['provider'] === 'gemini') {
+            return (new GeminiClient())->chat($userPrompt, $history, $model, $systemInstruction);
+        }
+
+        if ($this->apiKey === '') {
+            return '❌ DEEPSEEK_API_KEY belum diset di environment server. Pilih model Gemini di Panel Superadmin → Pengaturan AI, atau set DEEPSEEK_API_KEY.';
+        }
+
+        $messages = [];
+        if (trim($systemInstruction) !== '') {
+            $messages[] = ['role' => 'system', 'content' => trim($systemInstruction)];
+        }
+        foreach ($history as $item) {
+            $content = trim((string)($item['content'] ?? ''));
+            if ($content === '' || strpos($content, '❌') === 0) {
+                continue;
+            }
+            $role = (($item['role'] ?? 'user') === 'assistant') ? 'assistant' : 'user';
+            if ($role === 'assistant' && strpos($content, '🤖 ') === 0) {
+                $content = substr($content, strlen('🤖 '));
+            }
+            $messages[] = ['role' => $role, 'content' => $content];
+        }
+        $messages[] = ['role' => 'user', 'content' => $userPrompt];
+
+        $payload = json_encode([
+            'model'    => 'deepseek-chat',
+            'messages' => $messages,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        $ch = curl_init($this->apiUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $payload,
+            CURLOPT_HTTPHEADER     => [
+                'Authorization: Bearer ' . $this->apiKey,
+                'Content-Type: application/json',
+            ],
+            CURLOPT_TIMEOUT        => 90,
+        ]);
+        $response = curl_exec($ch);
+        $errno    = curl_errno($ch);
+        $curlErr  = curl_error($ch);
+        $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($errno || !$response) {
+            return '❌ Gagal menghubungi DeepSeek API: ' . ($curlErr ?: 'no response');
+        }
+
+        $data = json_decode($response, true);
+        if (!is_array($data)) {
+            return "❌ Respons DeepSeek tidak valid (HTTP {$httpCode}).";
+        }
+        if (isset($data['error'])) {
+            $msg = is_array($data['error']) ? ($data['error']['message'] ?? json_encode($data['error'])) : (string)$data['error'];
+            return '❌ Error DeepSeek API: ' . $msg;
+        }
+
+        $content = $data['choices'][0]['message']['content'] ?? null;
+        if ($content === null || trim((string)$content) === '') {
+            return "❌ Respons DeepSeek kosong (HTTP {$httpCode}).";
+        }
+
+        return markdownToTelegramHtml((string)$content);
+    }
+}
+
+// ============================================================
+//  AI Image Generation & Download Wrapper (Gemini Powered)
 // ============================================================
 class AiImageGen {
-    private string $baseUrl     = 'https://ai-seek.thebetter.ai/v4/chat/send';
-    private string $accessToken = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJBUy1YTVZMRyIsImF1ZCI6ImFpLXNlZWsiLCJwcm92aWRlciI6InV1aWQiLCJpc3MiOiJhaS1zZWVrIiwiZXhwIjoyMDk1NjE3NjEwLCJpYXQiOjE3ODAyNTc2MTB9.DhYlou7QJPNgbfc-tvpozxiKnNLWsDQqLSKI0XCBbOzyjEeBxK7SDFiYzc0RDfp5Kn2eDOUzqvYdcvOU9Y_vylnQsk2SrpB-c_8nBPPfCfi8mqHyrOhB3HlVf7azNji_6yS09X6q07DCEML6hB1n6jSl8JmXBSn0rU5Rh2MXOTU';
-    private string $deviceInfo  = 'appIdentifier=ai.chatbot.ask.chat.deep.seek.assistant.search.free;appVersion=2.7.2-26051464;deviceType=android;deviceCountry=ID;appCountry=id;local=id_ID;language=id;timezone=Asia/Jakarta;brand=xiaomi;model=Redmi%20Note%207;androidId=abe99601a1cd54d5';
-
     /**
-     * Hasilkan gambar dari prompt teks.
-     * Kembalikan URL gambar atau string error (diawali ❌).
+     * Generate gambar sebagai binary bytes + mime type.
      */
-    public function generate(string $prompt): string {
-        $sessionId     = generateUuidV7();
-        $userMessageId = generateUuidV7();
-        $aiMessageId   = generateUuidV7();
-
-        $payload = json_encode([
-            'sessionId'      => $sessionId,
-            'userMessageId'  => $userMessageId,
-            'aiMessageId'    => $aiMessageId,
-            'model'          => 'image-generation-guru',
-            'text'           => $prompt,
-            'restrictedType' => 'PRO_USER',
-            'sessionType'    => 'IMAGE',
-        ]);
-
-        $ch = curl_init($this->baseUrl);
-        curl_setopt_array($ch, [
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $payload,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 60,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_HTTPHEADER     => [
-                'x-app-id: ai-seek',
-                'x-device-info: ' . $this->deviceInfo,
-                'accept: text/event-stream',
-                'x-access-token: ' . $this->accessToken,
-                'content-type: application/json',
-                'user-agent: okhttp/4.12.0',
-            ],
-        ]);
-
-        $response = curl_exec($ch);
-        $errno    = curl_errno($ch);
-        $error    = curl_error($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        if ($errno || !$response) {
-            return '❌ Gagal menghubungi server AI gambar: ' . ($error ?: 'no response');
-        }
-        if ($httpCode === 401 || $httpCode === 403) {
-            return '❌ Token AI kedaluwarsa atau tidak valid. Hubungi administrator bot.';
-        }
-
-        // Parse SSE — cari event dengan field "images"
-        $imageUrl = null;
-        foreach (explode("\n", $response) as $line) {
-            $line = trim($line);
-            if (strpos($line, 'data:') !== 0) continue;
-            $json = trim(substr($line, 5));
-            if ($json === '') continue;
-            $obj = json_decode($json, true);
-            if (!is_array($obj)) continue;
-            if (!empty($obj['images']) && is_array($obj['images'])) {
-                $imageUrl = $obj['images'][0];
-                break;
-            }
-        }
-
-        if (!$imageUrl) {
-            return '❌ Tidak ada gambar yang dihasilkan. Coba prompt yang lebih spesifik.';
-        }
-
-        return $imageUrl;
+    public function generateBinary(string $prompt, ?string $model = null): array {
+        $resolved = AiConfig::resolveImageModel($model);
+        return (new GeminiClient())->generateImage($prompt, $resolved);
     }
 
     /**
-     * Ambil temporary S3 upload credentials dari API.
-     * Return array data atau null jika gagal.
+     * Edit gambar dari binary foto asli + instruksi.
      */
-    private function getImageUploadToken(string $ext = 'jpg'): ?array {
-        $url = 'https://ai-seek.thebetter.ai/v4/token/generate_image_token?count=1&extension=' . urlencode($ext);
-        $ch  = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 15,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_ENCODING       => 'gzip',
-            CURLOPT_HTTPHEADER     => [
-                'x-app-id: ai-seek',
-                'x-device-info: ' . $this->deviceInfo,
-                'x-access-token: ' . $this->accessToken,
-                'content-type: application/json',
-                'user-agent: okhttp/4.12.0',
-            ],
-        ]);
-        $resp = curl_exec($ch);
-        curl_close($ch);
-        $data = json_decode($resp, true);
-        return $data['data'] ?? null;
+    public function editImageBinary(string $imageBinary, string $instruction, ?string $model = null, string $mimeType = ''): array {
+        $resolved = AiConfig::resolveImageModel($model);
+        return (new GeminiClient())->editImage($imageBinary, $instruction, $resolved, $mimeType);
     }
 
     /**
-     * Upload binary gambar ke S3 menggunakan AWS Signature Version 4.
-     * Return true jika berhasil (HTTP 2xx).
-     */
-    private function uploadToS3(
-        string $body,
-        string $s3Key,
-        string $bucket,
-        string $accessKeyId,
-        string $secretKey,
-        string $sessionToken,
-        string $contentType = 'image/jpeg'
-    ): bool {
-        $region   = 'us-east-1';
-        $service  = 's3';
-        $host     = $bucket . '.s3-accelerate.amazonaws.com';
-        $endpoint = 'https://' . $host . '/' . $s3Key;
-
-        $now      = new DateTime('UTC');
-        $datetime = $now->format('Ymd\THis\Z');
-        $date     = $now->format('Ymd');
-        $bodyHash = hash('sha256', $body);
-
-        // Canonical headers — harus urut alfabet berdasarkan nama header
-        $canonicalHeaders = "content-type:{$contentType}\n"
-                          . "host:{$host}\n"
-                          . "x-amz-content-sha256:{$bodyHash}\n"
-                          . "x-amz-date:{$datetime}\n"
-                          . "x-amz-security-token:{$sessionToken}\n";
-        $signedHeaders = 'content-type;host;x-amz-content-sha256;x-amz-date;x-amz-security-token';
-
-        // Canonical request
-        $canonicalRequest = "PUT\n/{$s3Key}\n\n{$canonicalHeaders}\n{$signedHeaders}\n{$bodyHash}";
-
-        // String to sign
-        $scope        = "{$date}/{$region}/{$service}/aws4_request";
-        $stringToSign = "AWS4-HMAC-SHA256\n{$datetime}\n{$scope}\n" . hash('sha256', $canonicalRequest);
-
-        // Signing key (HMAC chain)
-        $kDate    = hash_hmac('sha256', $date,          'AWS4' . $secretKey, true);
-        $kRegion  = hash_hmac('sha256', $region,        $kDate,              true);
-        $kService = hash_hmac('sha256', $service,       $kRegion,            true);
-        $kSigning = hash_hmac('sha256', 'aws4_request', $kService,           true);
-        $signature = hash_hmac('sha256', $stringToSign, $kSigning);
-
-        $authHeader = "AWS4-HMAC-SHA256 Credential={$accessKeyId}/{$scope}, "
-                    . "SignedHeaders={$signedHeaders}, "
-                    . "Signature={$signature}";
-
-        $ch = curl_init($endpoint);
-        curl_setopt_array($ch, [
-            CURLOPT_CUSTOMREQUEST  => 'PUT',
-            CURLOPT_POSTFIELDS     => $body,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 60,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_HTTPHEADER     => [
-                'content-type: '         . $contentType,
-                'host: '                 . $host,
-                'x-amz-content-sha256: ' . $bodyHash,
-                'x-amz-date: '           . $datetime,
-                'x-amz-security-token: ' . $sessionToken,
-                'authorization: '        . $authHeader,
-                'user-agent: Dart/3.8 (dart:io)',
-            ],
-        ]);
-        $resp = curl_exec($ch);
-        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        return ($code >= 200 && $code < 300);
-    }
-
-    /**
-     * Edit gambar menggunakan AI.
-     * Upload foto asli ke S3, lalu kirim ke AI dengan instruksi.
-     *
-     * @param string $imageBinary  Data binary foto asli
-     * @param string $instruction  Instruksi edit untuk AI
-     * @return string URL gambar hasil, atau pesan error (diawali ❌)
-     */
-    public function editImage(string $imageBinary, string $instruction): string {
-        // Langkah 1: Dapatkan S3 upload credentials
-        $tokenData = $this->getImageUploadToken('jpg');
-        if (!$tokenData || empty($tokenData['imageS3KeyList'])) {
-            return '❌ Gagal mendapatkan token upload gambar.';
-        }
-        $s3Key        = $tokenData['imageS3KeyList'][0];
-        $bucket       = $tokenData['S3bucket'];
-        $accessKeyId  = $tokenData['accessKeyId'];
-        $secretKey    = $tokenData['secretAccessKey'];
-        $sessionToken = $tokenData['sessionToken'];
-
-        // Langkah 2: Upload gambar ke S3
-        $uploaded = $this->uploadToS3($imageBinary, $s3Key, $bucket, $accessKeyId, $secretKey, $sessionToken);
-        if (!$uploaded) {
-            return '❌ Gagal mengupload gambar ke server.';
-        }
-
-        // Langkah 3: Kirim request AI dengan imageS3Keys
-        $sessionId     = generateUuidV7();
-        $userMessageId = generateUuidV7();
-        $aiMessageId   = generateUuidV7();
-
-        $payload = json_encode([
-            'sessionId'      => $sessionId,
-            'userMessageId'  => $userMessageId,
-            'aiMessageId'    => $aiMessageId,
-            'model'          => 'image-generation-guru',
-            'text'           => $instruction,
-            'restrictedType' => 'PRO_USER',
-            'sessionType'    => 'IMAGE',
-            'imageS3Keys'    => [$s3Key],
-        ]);
-
-        $ch = curl_init($this->baseUrl);
-        curl_setopt_array($ch, [
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $payload,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 90,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_HTTPHEADER     => [
-                'x-app-id: ai-seek',
-                'x-device-info: ' . $this->deviceInfo,
-                'accept: text/event-stream',
-                'x-access-token: ' . $this->accessToken,
-                'content-type: application/json',
-                'user-agent: okhttp/4.12.0',
-            ],
-        ]);
-        $response = curl_exec($ch);
-        $errno    = curl_errno($ch);
-        $error    = curl_error($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        if ($errno || !$response) {
-            return '❌ Gagal menghubungi server AI: ' . ($error ?: 'no response');
-        }
-        if ($httpCode === 401 || $httpCode === 403) {
-            return '❌ Token AI kedaluwarsa atau tidak valid. Hubungi administrator bot.';
-        }
-
-        // Parse SSE — cari event dengan field "images"
-        $imageUrl = null;
-        foreach (explode("\n", $response) as $line) {
-            $line = trim($line);
-            if (strpos($line, 'data:') !== 0) continue;
-            $json = trim(substr($line, 5));
-            if ($json === '') continue;
-            $obj = json_decode($json, true);
-            if (!is_array($obj)) continue;
-            if (!empty($obj['images']) && is_array($obj['images'])) {
-                $imageUrl = $obj['images'][0];
-                break;
-            }
-        }
-
-        if (!$imageUrl) {
-            return '❌ AI tidak menghasilkan gambar. Coba instruksi yang lebih jelas.';
-        }
-        return $imageUrl;
-    }
-
-    /**
-     * Unduh gambar dari URL dan kembalikan binary-nya.
-     * Return null jika gagal.
+     * Unduh binary gambar dari URL (digunakan untuk ambil foto dari Telegram File API).
      */
     public function downloadImage(string $url): ?string {
         $ch = curl_init($url);
@@ -570,117 +770,53 @@ class AiImageGen {
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_TIMEOUT        => 30,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_USERAGENT      => 'okhttp/4.12.0',
+            CURLOPT_USERAGENT      => 'xnoxsguard-bot/3.1',
         ]);
         $data = curl_exec($ch);
-        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
-        return ($data && $code === 200) ? $data : null;
+        return ($data !== false && $data !== '' && $code >= 200 && $code < 300) ? $data : null;
     }
 }
 
 // ============================================================
-//  DeepSeek AI Client
+//  Unified AI Service Facade (reads SA Default Settings)
 // ============================================================
-class DeepSeek {
-    private $internalKey = "NiIsImtpZCI6I56";
-    private $baseUrl     = 'https://deepseekv2-qbvg2hl3qq-uc.a.run.app';
-    private $keyUrl      = 'https://rotatingkey-qbvg2hl3qq-uc.a.run.app';
-
-    public function getRotatingKey(): string {
-        $ch = curl_init($this->keyUrl);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER     => ['User-Agent: Android'],
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_TIMEOUT        => 15,
-        ]);
-        $response = curl_exec($ch);
-        if (curl_errno($ch)) {
-            throw new \Exception('Gagal mengambil rotatingKey: ' . curl_error($ch));
-        }
-        curl_close($ch);
-        $data = json_decode($response, true);
-        if (!isset($data['rotatingKey'])) {
-            throw new \Exception('RotatingKey tidak ditemukan dalam respon');
-        }
-        return $data['rotatingKey'];
+class AiService {
+    public static function getActiveChatModel(?Database $db = null): string {
+        $db = $db ?: (class_exists('Database') ? Database::getInstance() : null);
+        $raw = $db ? $db->getBotSetting('default_ai_chat', AiConfig::DEFAULT_CHAT_MODEL) : AiConfig::DEFAULT_CHAT_MODEL;
+        return AiConfig::resolveChatModel($raw);
     }
 
-    public function encrypt(string $text, string $key): array {
-        $iv        = openssl_random_pseudo_bytes(16);
-        $encrypted = openssl_encrypt($text, 'aes-128-cbc', $key, OPENSSL_RAW_DATA, $iv);
-        return [
-            'cipherText' => base64_encode($encrypted),
-            'iv'         => base64_encode($iv),
-        ];
+    public static function getActiveImageModel(?Database $db = null): string {
+        $db = $db ?: (class_exists('Database') ? Database::getInstance() : null);
+        $raw = $db ? $db->getBotSetting('default_ai_image', AiConfig::DEFAULT_IMAGE_MODEL) : AiConfig::DEFAULT_IMAGE_MODEL;
+        return AiConfig::resolveImageModel($raw);
     }
 
-    /**
-     * Kirim pesan ke AI.
-     *
-     * @param string $userPrompt  Pesan user terbaru
-     * @param array  $history     Riwayat percakapan: [ ['role'=>'user','content'=>'...'], ... ]
-     * @param string $model       Model yang digunakan
-     * @return string             Teks balasan AI (sudah diformat HTML Telegram), atau pesan error
-     */
-    public function chat(string $userPrompt, array $history = [], string $model = 'deepseek-chat'): string {
-        try {
-            $secretKey        = $this->getRotatingKey();
-            $encryptionResult = $this->encrypt($this->internalKey, $secretKey);
-            $bearerToken      = trim($encryptionResult['cipherText']);
-            $ivBase64         = $encryptionResult['iv'];
+    public static function chat(
+        string $userPrompt,
+        array $history = [],
+        ?string $model = null,
+        string $systemInstruction = ''
+    ): string {
+        $resolved = AiConfig::resolveChatModel($model ?? self::getActiveChatModel());
+        $info     = AiConfig::CHAT_MODELS[$resolved];
 
-            $messages   = $history;
-            $messages[] = ['role' => 'user', 'content' => $userPrompt];
-
-            $payload = [
-                'data'      => $userPrompt,
-                'iv'        => $ivBase64 . "\n",
-                'messages'  => $messages,
-                'model'     => $model,
-                'secretKey' => $secretKey,
-            ];
-
-            $ch = curl_init($this->baseUrl);
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_POST           => true,
-                CURLOPT_POSTFIELDS     => json_encode($payload),
-                CURLOPT_HTTPHEADER     => [
-                    'Authorization: Bearer ' . $bearerToken,
-                    'Content-Type: application/json',
-                    'User-Agent: okhttp/4.12.0',
-                ],
-                CURLOPT_SSL_VERIFYPEER => false,
-                CURLOPT_TIMEOUT        => 90,
-            ]);
-
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
-
-            if (!$response) {
-                return '❌ Tidak ada respons dari server AI.';
-            }
-
-            $data = json_decode($response, true);
-
-            if (isset($data['error'])) {
-                return '❌ Error AI: ' . (is_string($data['error']) ? $data['error'] : json_encode($data['error']));
-            }
-
-            $content = $data['data']['choices'][0]['message']['content'] ?? null;
-            if ($content === null) {
-                return '❌ Respons AI tidak valid (HTTP ' . $httpCode . ').';
-            }
-
-            // Konversi Markdown ke HTML Telegram
-            return markdownToTelegramHtml($content);
-
-        } catch (\Exception $e) {
-            return '❌ ' . $e->getMessage();
+        if ($info['provider'] === 'deepseek') {
+            return (new DeepSeek())->chat($userPrompt, $history, $resolved, $systemInstruction);
         }
+        return (new GeminiClient())->chat($userPrompt, $history, $resolved, $systemInstruction);
+    }
+
+    public static function generateImage(string $prompt, ?string $model = null): array {
+        $resolved = AiConfig::resolveImageModel($model ?? self::getActiveImageModel());
+        return (new AiImageGen())->generateBinary($prompt, $resolved);
+    }
+
+    public static function editImage(string $imageBinary, string $instruction, ?string $model = null, string $mimeType = ''): array {
+        $resolved = AiConfig::resolveImageModel($model ?? self::getActiveImageModel());
+        return (new AiImageGen())->editImageBinary($imageBinary, $instruction, $resolved, $mimeType);
     }
 }
